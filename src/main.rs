@@ -96,9 +96,6 @@ impl From<std::num::ParseIntError> for Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-static RE_STR: &str = r"^-- (\d{4})-(\d{2})-(\d{2}) ([^ ]+ )?(\d{2}):(\d{2}) -- (.*)$";
-
-
 impl DayRaw {
 
     fn read_line(stream: &mut std::io::BufRead) -> Result<(bool, String)>
@@ -257,14 +254,33 @@ impl DayRaw {
         return Ok(entries);
     }
 
+    pub fn parse_file(file_name: &str) -> Result<DayRaw> {
+        lazy_static!{
+              static ref RE: regex::Regex = regex::Regex::new(r"^(\d{4})(\d{2})(\d{2})(_.*)\.work$").expect("Erronuous Regular Expression");
+        }
 
+        let expected_date: Option<Date> = match RE.captures(file_name) {
+            Some(c) => {
+                let y = c[1].parse::<i32>()?;
+                let m = c[2].parse::<u32>()?;
+                let d = c[3].parse::<u32>()?;
+                match chrono::Local.ymd_opt(y, m, d) {
+                    chrono::LocalResult::Single(c) => Some(c),
+                    _ => None,
+                }
+            },
+            None => None,
+        };
+        let mut file = std::fs::File::open(file_name)?;
+        let mut fstream = std::io::BufReader::new(file);
+        return DayRaw::parse(&mut fstream, expected_date, file_name);
+    }
 }
 
 fn main() {
     for ref arg in std::env::args() {
         println!("file={}", arg);
-        let mut f = std::io::BufReader::new(std::fs::File::open(&arg).expect("File does not exist"));
-        println!("{:?}", DayRaw::parse(&mut f, None, arg));
+        println!("{:?}", DayRaw::parse_file(arg));
     }
 }
 
