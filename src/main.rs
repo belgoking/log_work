@@ -43,6 +43,30 @@ enum Error {
         found_date: Date },
 }
 
+impl PartialEq for Error {
+    fn eq(&self, other: &Error) -> bool {
+        use Error;
+        match (self, other) {
+            (&Error::IOError(_), &Error::IOError(_)) => true,
+            (&Error::ParseIntError(_), &Error::ParseIntError(_)) => true,
+            (&Error::TimeNotMonotonicError{file: ref s_file, line_nr: s_line_nr},
+             &Error::TimeNotMonotonicError{file: ref o_file, line_nr: o_line_nr}) =>
+                 (s_file==o_file && s_line_nr==o_line_nr),
+            (&Error::MissingDateError{file: ref s_file},
+             &Error::MissingDateError{file: ref o_file}) => (s_file==o_file),
+            (&Error::UnexpectedDateError{file: ref s_file, line_nr: s_line_nr,
+                                         expected_date: ref s_expected_date,
+                                         found_date: ref s_found_date},
+             &Error::UnexpectedDateError{file: ref o_file, line_nr: o_line_nr,
+                                         expected_date: ref o_expected_date,
+                                         found_date: ref o_found_date}) =>
+                (s_file==o_file && s_line_nr==o_line_nr &&
+                 s_expected_date==o_expected_date && s_found_date==o_found_date),
+            _ => return false,
+        }
+    }
+}
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
@@ -134,6 +158,7 @@ impl DayRaw {
         let date: Option<Date>;
         let (mut non_empty, mut line) = DayRaw::read_line(stream)?;
         while !non_empty {
+            line_nr += 1;
             let (tmp_non_empty, tmp_line) = DayRaw::read_line(stream)?;
             non_empty = tmp_non_empty;
             line = tmp_line;
@@ -147,7 +172,7 @@ impl DayRaw {
                 entries: Vec::new(), additional_text: String::new()});
         }
         // handle the entries, if there are some
-        let entries = DayRaw::parse_entries(&mut line, stream, &expected_date, file, &mut line_nr)?;
+        let entries = DayRaw::parse_entries(line, stream, &expected_date, file, &mut line_nr)?;
         date = if entries.is_empty() {
             expected_date
         } else {
@@ -157,6 +182,16 @@ impl DayRaw {
         // the remaining of the file is the description here we merely check that there is no
         // timestamp
         let mut additional_text = String::new();
+        {
+            let (_, tmp_line) = DayRaw::read_line(stream)?;
+            line = tmp_line;
+        }
+        while !line.is_empty() {
+            line_nr += 1;
+            additional_text.push_str(&line[..]);
+            let (_, tmp_line) = DayRaw::read_line(stream)?;
+            line = tmp_line;
+        }
         match date {
             Some(date) => Ok(DayRaw{date, entries, additional_text}),
             None => Err(Error::MissingDateError{file: file.to_string()}),
@@ -164,7 +199,7 @@ impl DayRaw {
     }
 
     fn parse_entries(
-        line: &mut String, stream: &mut std::io::BufRead,
+        line: String, stream: &mut std::io::BufRead,
         expected_date: &Option<Date>, file: &str, line_nr: &mut u32)
         -> Result<Vec<EntryRaw>>
     {
@@ -172,6 +207,7 @@ impl DayRaw {
         let mut entries = Vec::new();
         if let EntriesLine::Captures(c) = line_match {
             let mut entry_raw = DayRaw::parse_entry(&c[1], &c[2], &c[3], &c[5], &c[6], &c[7], &line)?;
+            *line_nr += 1;
             let expected_date =
                 match *expected_date {
                     None => entry_raw.start_ts.date(),
@@ -185,6 +221,7 @@ impl DayRaw {
                         found_date
                     }
                 };
+            let mut last_ts = entry_raw.start_ts;
             loop {
                 let (non_empty, line) = DayRaw::read_line(stream)?;
                 if !non_empty {
@@ -192,6 +229,7 @@ impl DayRaw {
                     break;
                 }
                 let line_match = DayRaw::parse_entries_line(&line);
+                *line_nr += 1;
                 match line_match {
                     EntriesLine::Captures(c) => {
                         entries.push(entry_raw);
@@ -201,6 +239,11 @@ impl DayRaw {
                                 file: file.to_string(), line_nr: *line_nr,
                                 expected_date, found_date: entry_raw.start_ts.date()});
                         }
+                        if last_ts > entry_raw.start_ts {
+                            return Err(Error::TimeNotMonotonicError{
+                                file: file.to_string(), line_nr: *line_nr});
+                        }
+                        last_ts = entry_raw.start_ts;
                     },
                     EntriesLine::Line => {
                         entry_raw = EntryRaw{
@@ -218,7 +261,11 @@ impl DayRaw {
 }
 
 fn main() {
-    println!("Hello, world!");
+    for ref arg in std::env::args() {
+        println!("file={}", arg);
+        let mut f = std::io::BufReader::new(std::fs::File::open(&arg).expect("File does not exist"));
+        println!("{:?}", DayRaw::parse(&mut f, None, arg));
+    }
 }
 
 #[cfg(test)]
@@ -226,23 +273,97 @@ mod tests {
     use std::io;
     use chrono;
     use chrono::TimeZone;
+
     #[test]
-    fn test_parse_entries_line()
+    fn test_parse_error_wrong_day_1()
+    {
+        let txt: &str = r"-- 2018-05-04 Mo 12:27 -- Foo Bar Baz";
+        let txt = txt.as_bytes();
+        let mut txt = io::BufReader::new(txt);
+        let expected_date = chrono::Local.ymd(2018, 5, 3);
+        let entries = super::DayRaw::parse(&mut txt, Some(expected_date), "tst_file");
+        let expected_error =
+            Err(super::Error::UnexpectedDateError{
+                    file: "tst_file".to_string(), line_nr: 1,
+                    expected_date,
+                    found_date: chrono::Local.ymd(2018, 5, 4)});
+        assert_eq!(expected_error, entries);
+    }
+
+    #[test]
+    fn test_parse_error_wrong_day_2()
     {
         let txt: &str = r"
 
--- 2018-05-04 Mo 12:27 -- Foo Bar Baz
--- 2018-05-04 Mo 12:47 -- Baz
+-- 2018-05-04 Mo 12:27 -- Foo Bar Baz";
+        let txt = txt.as_bytes();
+        let mut txt = io::BufReader::new(txt);
+        let expected_date = chrono::Local.ymd(2018, 5, 3);
+        let entries = super::DayRaw::parse(&mut txt, Some(expected_date), "tst_file");
+        let expected_error =
+            Err(super::Error::UnexpectedDateError{
+                    file: "tst_file".to_string(), line_nr: 3,
+                    expected_date,
+                    found_date: chrono::Local.ymd(2018, 5, 4)});
+        assert_eq!(expected_error, entries);
+    }
+
+    #[test]
+    fn test_parse_error_wrong_day_3()
+    {
+        let txt: &str = r"
+-- 2018-05-03 Mo 12:27 -- Foo Bar Baz
+-- 2018-05-04 Mo 12:27 -- Foo Bar Baz";
+        let txt = txt.as_bytes();
+        let mut txt = io::BufReader::new(txt);
+        let expected_date = chrono::Local.ymd(2018, 5, 3);
+        let entries = super::DayRaw::parse(&mut txt, Some(expected_date), "tst_file");
+        let expected_error =
+            Err(super::Error::UnexpectedDateError{
+                    file: "tst_file".to_string(), line_nr: 3,
+                    expected_date,
+                    found_date: chrono::Local.ymd(2018, 5, 4)});
+        assert_eq!(expected_error, entries);
+    }
+
+    #[test]
+    fn test_parse_error_time_non_monotonic()
+    {
+        let txt: &str = r"-- 2018-05-04 Mo 12:27 -- Foo Bar Baz
+-- 2018-05-04 Mo 12:26 -- Foo Bar Baz";
+        let mut txt = io::BufReader::new(txt.as_bytes());
+        let entries = super::DayRaw::parse(&mut txt, None, "tst_file");
+        let expected_error =
+            Err(super::Error::TimeNotMonotonicError{
+                    file: "tst_file".to_string(), line_nr: 2});
+        assert_eq!(expected_error, entries);
+    }
+
+    #[test]
+    fn test_parse_entries_line_with_empty_lines()
+    {
+        let txt: &str = r"-- 2018-05-04 Mo 12:27 -- Foo
+Bar Baz
+-- 2018-05-04 Mo 12:47 -- Bam
 
 Hier kommt jetzt einfach nur noch geblubber
 ";
         let txt = txt.as_bytes();
         let mut txt = io::BufReader::new(txt);
-        let entries = super::DayRaw::parse(&mut txt, None, "tst-file");
+        let parsed_entries = super::DayRaw::parse(&mut txt, None, "tst_file");
+        assert!(parsed_entries.is_ok());
+
+        let expected_entries = vec![
+            super::EntryRaw{ start_ts: chrono::Local.ymd(2018, 5, 4).and_hms(12, 27, 0),
+                key: "Foo".to_string(), sub_keys: Vec::new(),
+                raw_data: "-- 2018-05-04 Mo 12:27 -- Foo\nBar Baz\n".to_string()},
+            super::EntryRaw{ start_ts: chrono::Local.ymd(2018, 5, 4).and_hms(12, 47, 0),
+                key: "Bam".to_string(), sub_keys: Vec::new(),
+                raw_data: "-- 2018-05-04 Mo 12:47 -- Bam\n".to_string()}];
         let expected = super::DayRaw{
-            date: chrono::Local.ymd(2018, 4, 4),
-            entries: Vec::new(), additional_text: String::new()};
-        assert!(entries.is_ok());
-        assert_eq!(entries.unwrap(), expected);
+            date: chrono::Local.ymd(2018, 5, 4),
+            entries: expected_entries,
+            additional_text: "Hier kommt jetzt einfach nur noch geblubber\n".to_string()};
+        assert_eq!(parsed_entries.unwrap(), expected);
     }
 }
