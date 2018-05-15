@@ -18,14 +18,6 @@ struct EntryRaw {
     raw_data: String,
 }
 
-#[derive(PartialEq)]
-#[derive(Debug)]
-struct DayRaw {
-    date: Date,
-    entries: Vec<EntryRaw>,
-    additional_text: String,
-}
-
 #[derive(Debug)]
 enum EntriesLine<'a> {
     Captures(regex::Captures<'a>),
@@ -96,6 +88,14 @@ impl From<std::num::ParseIntError> for Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
+#[derive(PartialEq)]
+#[derive(Debug)]
+struct DayRaw {
+    date: Date,
+    entries: Vec<EntryRaw>,
+    additional_text: String,
+}
+
 impl DayRaw {
 
     fn read_line(stream: &mut std::io::BufRead) -> Result<(bool, String)>
@@ -139,14 +139,6 @@ impl DayRaw {
         let start_ts = chrono::Local.ymd(year, month, day).and_hms(hour, minute, 0);
 
         Ok(EntryRaw{start_ts, key, sub_keys, raw_data: raw_data.to_string()})
-    }
-
-    fn check_date(expected_date: Date, found_date: Date, file: &str, line_nr: u32) -> Result<()>
-    {
-        if expected_date != found_date {
-            return Err(Error::UnexpectedDateError{ file: file.to_string(), line_nr, expected_date, found_date });
-        }
-        Ok(())
     }
 
     pub fn parse(stream: &mut std::io::BufRead, expected_date: Option<Date>, file: &str) -> Result<DayRaw>
@@ -193,6 +185,20 @@ impl DayRaw {
             Some(date) => Ok(DayRaw{date, entries, additional_text}),
             None => Err(Error::MissingDateError{file: file.to_string()}),
         }
+    }
+
+    pub fn parse_files(mut files: Vec<String>) -> Vec<DayRaw>
+    {
+        files.sort();
+        let mut ret: Vec<DayRaw> = Vec::new();
+        ret.reserve_exact(files.len());
+        for ref file in files {
+            match DayRaw::parse_file(file) {
+                Ok(day_raw) => ret.push(day_raw),
+                Err(e) => println!("\tFailed to parse file={} error={:?}", file, e),
+            }
+        }
+        return ret;
     }
 
     fn parse_entries(
@@ -271,16 +277,18 @@ impl DayRaw {
             },
             None => None,
         };
-        let mut file = std::fs::File::open(file_name)?;
+        let file = std::fs::File::open(file_name)?;
         let mut fstream = std::io::BufReader::new(file);
         return DayRaw::parse(&mut fstream, expected_date, file_name);
     }
 }
 
 fn main() {
-    for ref arg in std::env::args() {
-        println!("file={}", arg);
-        println!("{:?}", DayRaw::parse_file(arg));
+    let mut args: Vec<String> = std::env::args().collect();
+    args.remove(0);
+
+    for day_raw in DayRaw::parse_files(args) {
+        println!("Pupupu: {:?}", day_raw);
     }
 }
 
