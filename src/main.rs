@@ -2,6 +2,10 @@
 extern crate chrono;
 extern crate regex;
 
+#[macro_use] extern crate structopt;
+
+use structopt::StructOpt;
+
 /** TODO
  * Collect sub-keys
  * Collect and sum up the entries of one day
@@ -38,12 +42,13 @@ enum EntriesLine<'a> {
 enum Error {
     IOError(std::io::Error),
     ParseIntError(std::num::ParseIntError),
-    ParseDayTypeError{ file: String, line_nr: u32 },
-    TimeNotMonotonicError{ file: String, line_nr: u32 },
-    MissingDateError{ file: String },
-    UnexpectedDateError{ file: String, line_nr: u32,
+    InvalidFileNameError{file: std::path::PathBuf},
+    ParseDayTypeError{file: String, line_nr: u32},
+    TimeNotMonotonicError{file: String, line_nr: u32},
+    MissingDateError{file: String},
+    UnexpectedDateError{file: String, line_nr: u32,
         expected_date: Date,
-        found_date: Date },
+        found_date: Date},
 }
 
 impl PartialEq for Error {
@@ -52,6 +57,9 @@ impl PartialEq for Error {
         match (self, other) {
             (&Error::IOError(_), &Error::IOError(_)) => true,
             (&Error::ParseIntError(_), &Error::ParseIntError(_)) => true,
+            (&Error::InvalidFileNameError{file: ref s_file},
+             &Error::InvalidFileNameError{file: ref o_file}) =>
+                 (s_file==o_file),
             (&Error::ParseDayTypeError{file: ref s_file, line_nr: s_line_nr},
              &Error::ParseDayTypeError{file: ref o_file, line_nr: o_line_nr}) =>
                  (s_file==o_file && s_line_nr==o_line_nr),
@@ -78,6 +86,8 @@ impl std::fmt::Display for Error {
         match *self {
             Error::IOError(ref err) => write!(f, "IOError: {}", err),
             Error::ParseIntError(ref err) => write!(f, "ParseIntError: {}", err),
+            Error::InvalidFileNameError{ref file} =>
+                write!(f, "InvalidFileNameError: {:?}", file),
             Error::ParseDayTypeError{ref file, ref line_nr} =>
                 write!(f, "ParseDayTypeError: {}:{}", file, line_nr),
             Error::TimeNotMonotonicError{ref file, ref line_nr} =>
@@ -269,12 +279,17 @@ impl WorkDay {
         return Ok(entries);
     }
 
-    pub fn parse_file(file_name: &str) -> Result<WorkDay> {
+    pub fn parse_file(file_name: &std::path::PathBuf) -> Result<WorkDay> {
         lazy_static!{
               static ref RE: regex::Regex = regex::Regex::new(r"^(\d{4})(\d{2})(\d{2})(_.*)\.work$").expect("Erronuous Regular Expression");
         }
 
-        let expected_date: Option<Date> = match RE.captures(file_name) {
+        let file_name_str =
+            match file_name.to_str() {
+                Some(fi) => fi,
+                None => return Err(Error::InvalidFileNameError{file: file_name.clone()}),
+            };
+        let expected_date: Option<Date> = match RE.captures(file_name_str) {
             Some(c) => {
                 let y = c[1].parse::<i32>()?;
                 let m = c[2].parse::<u32>()?;
@@ -288,7 +303,7 @@ impl WorkDay {
         };
         let file = std::fs::File::open(file_name)?;
         let mut fstream = std::io::BufReader::new(file);
-        return WorkDay::parse(&mut fstream, expected_date, file_name);
+        return WorkDay::parse(&mut fstream, expected_date, file_name_str);
     }
 }
 
@@ -394,7 +409,7 @@ struct Days {
 }
 
 impl Days {
-    pub fn parse_work_files(mut files: Vec<String>) -> Vec<Result<WorkDay>>
+    pub fn parse_work_files(mut files: Vec<std::path::PathBuf>) -> Vec<Result<WorkDay>>
     {
         files.sort();
         let mut ret: Vec<Result<WorkDay>> = Vec::new();
@@ -414,11 +429,27 @@ impl Days {
 //    }
 }
 
+#[derive(Debug, StructOpt)]
+#[structopt(about="Read .work-files and give summaries of worked time.")]
+#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
+struct Opt {
+    /// A file containing holidays and vacations
+    #[structopt(short="H", long="holidays", parse(from_os_str))]
+    holidays: Option<std::path::PathBuf>,
+
+    /// The .work-files
+    #[structopt(parse(from_os_str))]
+    files: Vec<std::path::PathBuf>,
+}
+
 fn main() {
+
+    let opt = Opt::from_args();
+
     let mut args: Vec<String> = std::env::args().collect();
     args.remove(0);
 
-    for day_raw in Days::parse_work_files(args) {
+    for day_raw in Days::parse_work_files(opt.files) {
         println!("Pupupu: {:?}", day_raw);
     }
 }
