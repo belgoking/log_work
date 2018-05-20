@@ -312,13 +312,14 @@ impl WorkDay {
 #[derive(Clone)]
 #[derive(Debug)]
 pub enum DayType {
-    WorkDay,                              // A - Arbeitstag`
-    JobTravel{description: String},       // D - Dienstreise
-    Sick{description: String},            // K - Krank
+    WorkDay,                                // A - Arbeitstag`
+    JobTravel{description: String},         // D - Dienstreise
+    Sick{description: String},              // K - Krank
     WeekEnd,
-    Holiday{name: String},                // F - Feiertag
-    Vacation{description: String},        // U - Urlaub
-    VacationHalfDay{description: String}, // H - Halber Tag Urlaub
+    Holiday{name: String},                  // F - Feiertag
+    Vacation{description: String},          // U - Urlaub
+    VacationHalfDay{description: String},   // H - Halber Tag Urlaub
+    OvertimeReduction{description: String}, // Ü - Überstundenabbau
 }
 
 fn get_day_type_description(c: &regex::Captures) -> String {
@@ -329,32 +330,43 @@ fn get_day_type_description(c: &regex::Captures) -> String {
     return c[5].to_string();
 }
 
-//impl std::str::FromStr for DayType {
-//    type Err = Error;
-//    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-    fn day_type_from_str(s: &str, file_name: &str, line_nr: u32) -> Result<DayType> {
-        lazy_static!{
-            static ref RE: regex::Regex = regex::Regex::new(r"^([DKFUH]) +((([^:]*):)|([^ ]*)).*$")
-                .expect("Erronuous Regular Expression for holiday type parsing");
-        }
-        match RE.captures(s) {
-            Some(c) => {
-                match &c[1] {
-//                    "A" => return Ok(DayType::WorkDay),
-                    "D" => return Ok(DayType::JobTravel{description: get_day_type_description(&c)}),
-                    "K" => return Ok(DayType::Sick{description: get_day_type_description(&c)}),
-                    "F" => return Ok(DayType::Holiday{name: get_day_type_description(&c)}),
-                    "U" => return Ok(DayType::Vacation{description: get_day_type_description(&c)}),
-                    "H" => return Ok(DayType::VacationHalfDay{description: get_day_type_description(&c)}),
-                    _ => return Err(Error::ParseDayTypeError{file: file_name.to_string(), line_nr}),
-                }
-            },
-            None => {
-                return Err(Error::ParseDayTypeError{file: file_name.to_string(), line_nr});
+
+fn parse_required_time_file(file_name: &std::path::PathBuf) -> Result<Vec<(Date, DayType)>>
+{
+    let file = std::fs::File::open(&file_name)?;
+    let mut fstream = std::io::BufReader::new(file);
+    let file_name_str =
+        match file_name.to_str() {
+            Some(fi) => fi,
+            None     => return Err(Error::InvalidFileNameError{file: file_name.clone()}),
+        };
+    let ret = parse_required_time(&mut fstream, file_name_str)?;
+    return Ok(ret);
+}
+
+
+fn day_type_from_str(s: &str, file_name: &str, line_nr: u32) -> Result<DayType> {
+    lazy_static!{
+        static ref RE: regex::Regex = regex::Regex::new(r"^([DKFUHÜ]) +((([^:]*):)|([^ ]*)).*$")
+            .expect("Erronuous Regular Expression for holiday type parsing");
+    }
+    match RE.captures(s) {
+        Some(c) => {
+            match &c[1] {
+                "D" => return Ok(DayType::JobTravel{description: get_day_type_description(&c)}),
+                "K" => return Ok(DayType::Sick{description: get_day_type_description(&c)}),
+                "F" => return Ok(DayType::Holiday{name: get_day_type_description(&c)}),
+                "U" => return Ok(DayType::Vacation{description: get_day_type_description(&c)}),
+                "H" => return Ok(DayType::VacationHalfDay{description: get_day_type_description(&c)}),
+                "Ü" => return Ok(DayType::OvertimeReduction{description: get_day_type_description(&c)}),
+                _ => return Err(Error::ParseDayTypeError{file: file_name.to_string(), line_nr}),
             }
+        },
+        None => {
+            return Err(Error::ParseDayTypeError{file: file_name.to_string(), line_nr});
         }
     }
-//}
+}
 
 fn parse_required_time(stream: &mut std::io::BufRead, file_name: &str) -> Result<Vec<(Date, DayType)>>
 {
@@ -420,7 +432,7 @@ impl Days {
         return ret;
     }
 
-//    pub fn load(mut files: Vec<String>, _special_dates_file: Option<String>) -> Days
+//    pub fn load(mut files: Vec<std::path::PathBuf>, _special_dates_file: Option<String>) -> Days
 //    {
 //        // read work_files
 //        // read special_dates
@@ -443,14 +455,19 @@ struct Opt {
 }
 
 fn main() {
-
     let opt = Opt::from_args();
 
-    let mut args: Vec<String> = std::env::args().collect();
-    args.remove(0);
+    let required_time =
+        match opt.holidays {
+            Some(fp) => {
+                Some(parse_required_time_file(&fp))
+            },
+            None => None,
+        };
+    println!("Required-times: {:?}", required_time);
 
     for day_raw in Days::parse_work_files(opt.files) {
-        println!("Pupupu: {:?}", day_raw);
+        println!("Day: {:?}", day_raw);
     }
 }
 
@@ -557,8 +574,8 @@ Hier kommt jetzt einfach nur noch geblubber
     fn test_parse_required_time_1()
     {
         let txt: &str = r"2018-05-04 -- D Mehrere Worte:";
-        let expected = vec![
-            (chrono::Local.ymd(2018, 5, 4), super::DayType::JobTravel{description: "Mehrere Worte".to_string()})];
+        let expected = Ok(vec![
+            (chrono::Local.ymd(2018, 5, 4), super::DayType::JobTravel{description: "Mehrere Worte".to_string()})]);
         do_test_parse_required_time(txt, expected);
     }
 
@@ -566,29 +583,50 @@ Hier kommt jetzt einfach nur noch geblubber
     fn test_parse_required_time_2()
     {
         let txt: &str = r"2018-05-04--2018-05-05 -- H This is a half day";
-        let expected = vec![
+        let expected = Ok(vec![
             (chrono::Local.ymd(2018, 5, 4), super::DayType::VacationHalfDay{description: "This".to_string()}),
-            (chrono::Local.ymd(2018, 5, 5), super::DayType::VacationHalfDay{description: "This".to_string()})];
+            (chrono::Local.ymd(2018, 5, 5), super::DayType::VacationHalfDay{description: "This".to_string()})]);
         do_test_parse_required_time(txt, expected);
     }
 
     #[test]
     fn test_parse_required_time_3()
     {
-        let txt: &str = r"2018-05-04--2018-05-05 -- H This is: a half day";
-        let expected = vec![
-            (chrono::Local.ymd(2018, 5, 4), super::DayType::VacationHalfDay{description: "This is".to_string()}),
-            (chrono::Local.ymd(2018, 5, 5), super::DayType::VacationHalfDay{description: "This is".to_string()})];
+        let txt: &str = r"2018-05-04--2018-05-05 -- K This is: a sickness day";
+        let expected = Ok(vec![
+            (chrono::Local.ymd(2018, 5, 4), super::DayType::Sick{description: "This is".to_string()}),
+            (chrono::Local.ymd(2018, 5, 5), super::DayType::Sick{description: "This is".to_string()})]);
         do_test_parse_required_time(txt, expected);
     }
 
-    fn do_test_parse_required_time(txt: &str, expected: Vec<(super::Date, super::DayType)>)
+    #[test]
+    fn test_parse_required_time_4()
+    {
+        let txt: &str = r"2018-05-04 -- F This is: a holiday
+2018-05-07 -- U A vacation day
+2018-05-06 -- Ü Brückentag";
+        let expected = Ok(vec![
+            (chrono::Local.ymd(2018, 5, 4), super::DayType::Holiday{name: "This is".to_string()}),
+            (chrono::Local.ymd(2018, 5, 7), super::DayType::Vacation{description: "A".to_string()}),
+            (chrono::Local.ymd(2018, 5, 6), super::DayType::OvertimeReduction{description: "Brückentag".to_string()})]);
+        do_test_parse_required_time(txt, expected);
+    }
+
+    #[test]
+    fn test_parse_required_time_error_1()
+    {
+        let txt: &str = r"2018-05-04 -- F This is: a holiday
+2018-05-07 -- u A half day";
+        let expected = Err(super::Error::ParseDayTypeError{file: "tst_file".to_string(), line_nr: 2});
+        do_test_parse_required_time(txt, expected);
+    }
+
+    fn do_test_parse_required_time(txt: &str, expected: super::Result<Vec<(super::Date, super::DayType)>>)
     {
         let txt = txt.as_bytes();
         let mut txt = io::BufReader::new(txt);
         let parsed_entries = super::parse_required_time(&mut txt, "tst_file");
-        assert!(parsed_entries.is_ok());
 
-        assert_eq!(parsed_entries.unwrap(), expected);
+        assert_eq!(parsed_entries, expected);
     }
 }
