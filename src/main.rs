@@ -281,7 +281,7 @@ impl WorkDay {
 
     pub fn parse_file(file_name: &std::path::PathBuf) -> Result<WorkDay> {
         lazy_static!{
-              static ref RE: regex::Regex = regex::Regex::new(r"^(\d{4})(\d{2})(\d{2})(_.*)\.work$").expect("Erronuous Regular Expression");
+              static ref RE: regex::Regex = regex::Regex::new(r"(^|/)(\d{4})(\d{2})(\d{2})(_.*)\.work$").expect("Erronuous Regular Expression");
         }
 
         let file_name_str =
@@ -291,9 +291,9 @@ impl WorkDay {
             };
         let expected_date: Option<Date> = match RE.captures(file_name_str) {
             Some(c) => {
-                let y = c[1].parse::<i32>()?;
-                let m = c[2].parse::<u32>()?;
-                let d = c[3].parse::<u32>()?;
+                let y = c[2].parse::<i32>()?;
+                let m = c[3].parse::<u32>()?;
+                let d = c[4].parse::<u32>()?;
                 match chrono::Local.ymd_opt(y, m, d) {
                     chrono::LocalResult::Single(c) => Some(c),
                     _ => None,
