@@ -6,9 +6,7 @@ use super::*;
 use self::util;
 use std;
 
-#[derive(Eq)]
-#[derive(PartialEq)]
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct EntryRaw {
     start_ts: DateTime,
     key: String,
@@ -22,9 +20,7 @@ enum EntriesLine<'a> {
     Line,
 }
 
-#[derive(Eq)]
-#[derive(PartialEq)]
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct WorkDay {
     date: Date,
     entries: Vec<EntryRaw>,
@@ -207,9 +203,7 @@ impl WorkDay {
     }
 }
 
-#[derive(Eq)]
-#[derive(PartialEq)]
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct Day {
     date: Date,
     required_time: std::time::Duration,

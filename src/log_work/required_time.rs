@@ -6,10 +6,7 @@ use self::util;
 use std;
 
 
-#[derive(Eq)]
-#[derive(PartialEq)]
-#[derive(Clone)]
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DayType {
     WorkDay,                                // A - Arbeitstag
     JobTravel{description: String},         // D - Dienstreise
@@ -21,7 +18,7 @@ pub enum DayType {
     OvertimeReduction{description: String}, // Ü - Überstundenabbau
 }
 
-#[derive(Eq, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 enum DayTypeClass {
     Work,
     Vacation,
@@ -43,7 +40,7 @@ impl DayType {
     }
 }
 
-#[derive(Eq,PartialEq,Clone,Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DayTypeEntry {
     date: Date,
     day_type: DayType,
