@@ -3,6 +3,7 @@ extern crate regex;
 
 use super::*;
 use self::util;
+use self::chrono::Datelike;
 use std;
 
 
@@ -71,29 +72,93 @@ fn check_day_types(orig: &DayTypeEntry, new: &DayTypeEntry) -> Result<()>
     return Ok(());
 }
 
-fn consolidate_required_time(raw_entries: &Vec<DayTypeEntry>, start_date: &Date, end_date: &Date) -> Result<()>
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct RequiredTime {
+    date: Date,
+    day_type: DayType,
+    required_time: chrono::Duration,
+    line_nr: u32,
+}
+
+fn consolidate_required_time(raw_entries: &Vec<DayTypeEntry>, start_date: &Date, end_date: &Date, duration_of_day: &chrono::Duration) -> Result<Vec<RequiredTime>>
 {
     let mut map: std::collections::BTreeMap<Date, DayTypeEntry> = std::collections::BTreeMap::new();
     for ref raw_entry in raw_entries {
-        let mut found = false;
-        if let Some(ref mut old_entry) = map.get(&raw_entry.date) {
-            found = true;
-            check_day_types(old_entry, raw_entry)?;
-            if raw_entry.day_type.to_day_type_class() > old_entry.day_type.to_day_type_class() {
-                let mut cloned = raw_entry.clone();
-                *old_entry = cloned;
-            }
-//        } else {
-//            let cloned = (*raw_entry).clone();
-//            map.insert(raw_entry.date.clone(), cloned);
-        };
-        if !found {
-            let cloned = (*raw_entry).clone();
-            map.insert(raw_entry.date.clone(), cloned);
+        let mut old_entry = map.entry(raw_entry.date.clone());
+        match old_entry {
+            std::collections::btree_map::Entry::Vacant(mut vacant_entry) => {
+                vacant_entry.insert((*raw_entry).clone());
+            },
+            std::collections::btree_map::Entry::Occupied(mut occupied_entry) => {
+                check_day_types(occupied_entry.get(), raw_entry)?;
+                if raw_entry.day_type.to_day_type_class() > occupied_entry.get().day_type.to_day_type_class()
+                {
+                    *occupied_entry.get_mut() = (*raw_entry).clone();
+                }
+            },
         }
-
     }
-    return Ok(());
+    let mut ret: Vec<RequiredTime> = Vec::new();
+    let mut curr_date = start_date.clone();
+    while curr_date <= *end_date {
+        match map.get(&curr_date.clone()) {
+            Some(ref day_type_entry) => {
+                ret.push(RequiredTime{
+                    date: curr_date.clone(),
+                    day_type: day_type_entry.day_type.clone(),
+                    required_time: compute_required_time(&curr_date, &day_type_entry.day_type, duration_of_day),
+                    line_nr: day_type_entry.line_nr});
+            },
+            None => {
+                ret.push(RequiredTime{
+                    date: curr_date.clone(),
+                    day_type: compute_day_type(&curr_date),
+                    required_time: compute_simple_required_time(&curr_date, duration_of_day),
+                    line_nr: 0,
+                });
+            }
+        }
+        curr_date = curr_date.succ();
+    }
+    return Ok(ret);
+}
+
+fn compute_day_type(date: &Date) -> DayType {
+    if date.weekday().num_days_from_monday() < 4 {
+        return DayType::WorkDay;
+    } else {
+        return DayType::WeekEnd;
+    }
+}
+
+fn compute_simple_required_time(date: &Date, duration_of_day: &chrono::Duration) -> chrono::Duration {
+    match compute_day_type(date) {
+        DayType::WorkDay => { return duration_of_day.clone(); },
+        DayType::WeekEnd => { return chrono::Duration::hours(0); },
+        _ => { panic!("Error in compute_day_type()"); }
+    }
+}
+
+fn compute_required_time(date: &Date, day_type: &DayType, duration_of_day: &chrono::Duration) -> chrono::Duration
+{
+    if let DayType::WeekEnd = compute_day_type(date) {
+        return chrono::Duration::hours(0);
+    };
+    match *day_type {
+        DayType::JobTravel{description:_}|DayType::Sick{description:_} => {
+            return chrono::Duration::hours(0);
+        },
+        DayType::Holiday{name:_}|DayType::Vacation{description:_} => {
+            return chrono::Duration::hours(0);
+        },
+        DayType::VacationHalfDay{description:_} => {
+            return duration_of_day.clone()/2;
+        },
+        DayType::OvertimeReduction{description:_} => {
+            return duration_of_day.clone();
+        },
+        DayType::WeekEnd|DayType::WorkDay => { panic!("illegal DayType: {:?}", *day_type); },
+    };
 }
 
 pub fn parse_required_time_file(file_name: &std::path::PathBuf) -> Result<Vec<DayTypeEntry>>
@@ -222,6 +287,23 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_required_time_with_foo()
+    {
+        let txt: &str = r"foo
+2018-05-04 -- F This is: a holiday
+bar
+2018-05-07 -- U A vacation day
+-- 2018-05-06 -- Ü Brückentag
+#2018-05-06 -- Ü Brückentag";
+        let expected =
+            Ok(vec![
+                DayTypeEntry{date: chrono::Local.ymd(2018, 5, 4), day_type: DayType::Holiday{name: "This is".to_string()}, given_as_range: false, line_nr: 2},
+                DayTypeEntry{date: chrono::Local.ymd(2018, 5, 7), day_type: DayType::Vacation{description: "A".to_string()}, given_as_range: false, line_nr: 4},
+            ]);
+        do_test_parse_required_time(txt, expected);
+    }
+
+    #[test]
     fn test_parse_required_time_error_1()
     {
         let txt: &str = r"2018-05-04 -- F This is: a holiday
@@ -245,6 +327,31 @@ mod tests {
         let parsed_entries = parse_required_time(&mut txt, "tst_file");
 
         assert_eq!(parsed_entries, expected);
+    }
+
+    #[test]
+    fn test_consolidate_required_time()
+    {
+        let special_required_times = vec![
+            DayTypeEntry{date: chrono::Local.ymd(2018, 5, 4), day_type: DayType::Holiday{name: "ho".to_string()}, given_as_range: false, line_nr: 1},
+            DayTypeEntry{date: chrono::Local.ymd(2018, 5, 6), day_type: DayType::Vacation{description: "A".to_string()}, given_as_range: false, line_nr: 5}];
+        let full_day_duration = chrono::Duration::hours(7) + chrono::Duration::minutes(42);
+        let result = consolidate_required_time(&special_required_times, &chrono::Local.ymd(2018, 5, 3), &chrono::Local.ymd(2018, 5, 6), &full_day_duration);
+        let expected =
+            Ok(vec![
+               RequiredTime{date: chrono::Local.ymd(2018, 5, 3), day_type: DayType::WorkDay,
+                            required_time: full_day_duration, line_nr: 0},
+
+               RequiredTime{date: chrono::Local.ymd(2018, 5, 4), day_type: DayType::Holiday{name: "ho".to_string()},
+                            required_time: chrono::Duration::hours(0), line_nr: 1},
+
+               RequiredTime{date: chrono::Local.ymd(2018, 5, 5), day_type: DayType::WeekEnd,
+                            required_time: chrono::Duration::hours(0), line_nr: 0},
+
+               RequiredTime{date: chrono::Local.ymd(2018, 5, 6), day_type: DayType::Vacation{description: "A".to_string()},
+                            required_time: chrono::Duration::hours(0), line_nr: 5},
+            ]);
+        assert_eq!(result, expected);
     }
 }
 
