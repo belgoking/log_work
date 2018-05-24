@@ -63,11 +63,17 @@ fn check_day_types(orig: &DayTypeEntry, new: &DayTypeEntry) -> Result<()>
     if orig.date != new.date {
         return Ok(());
     }
-    if !new.given_as_range && new.day_type.to_day_type_class() != DayTypeClass::WeekendAndHolidays {
-        return Err(Error::DuplicateDateError{file: "".to_string() /*new.file.clone()*/, line_nr: new.line_nr});
-    }
     if !orig.given_as_range && orig.day_type.to_day_type_class() != DayTypeClass::WeekendAndHolidays {
-        return Err(Error::DuplicateDateError{file: "".to_string() /*orig.file.clone()*/, line_nr: orig.line_nr});
+        match orig.day_type {
+            DayType::JobTravel{description:_} => (),
+            _ => { return Err(Error::DuplicateDateError{file: "".to_string() /*orig.file.clone()*/, line_nr: orig.line_nr}); },
+        };
+    }
+    if !new.given_as_range && new.day_type.to_day_type_class() != DayTypeClass::WeekendAndHolidays {
+        match new.day_type {
+            DayType::JobTravel{description:_} => (),
+            _ => { return Err(Error::DuplicateDateError{file: "".to_string() /*new.file.clone()*/, line_nr: new.line_nr}); },
+        };
     }
     return Ok(());
 }
@@ -101,8 +107,11 @@ fn consolidate_required_time(raw_entries: &Vec<DayTypeEntry>, start_date: &Date,
     let mut ret: Vec<RequiredTime> = Vec::new();
     let mut curr_date = start_date.clone();
     while curr_date <= *end_date {
-        match map.get(&curr_date.clone()) {
+        match map.get(&curr_date) {
             Some(ref day_type_entry) => {
+                check_day_types(&DayTypeEntry{date: curr_date.clone(), day_type: compute_day_type(&curr_date),
+                                              given_as_range: true, line_nr: 0},
+                                day_type_entry)?;
                 ret.push(RequiredTime{
                     date: curr_date.clone(),
                     day_type: day_type_entry.day_type.clone(),
@@ -124,7 +133,7 @@ fn consolidate_required_time(raw_entries: &Vec<DayTypeEntry>, start_date: &Date,
 }
 
 fn compute_day_type(date: &Date) -> DayType {
-    if date.weekday().num_days_from_monday() < 4 {
+    if date.weekday().num_days_from_monday() <= 4 {
         return DayType::WorkDay;
     } else {
         return DayType::WeekEnd;
@@ -304,7 +313,7 @@ bar
     }
 
     #[test]
-    fn test_parse_required_time_error_1()
+    fn test_parse_required_time_with_unknown_type_error()
     {
         let txt: &str = r"2018-05-04 -- F This is: a holiday
 2018-05-07 -- u A half day";
@@ -313,7 +322,7 @@ bar
     }
 
     #[test]
-    fn test_parse_required_time_error_2()
+    fn test_parse_required_time_with_invalid_range_error()
     {
         let txt: &str = r"2018-05-04--2018-04-05 -- F This is: a holiday";
         let expected = Err(Error::ParseDayTypeError{file: "tst_file".to_string(), line_nr: 1});
@@ -333,10 +342,13 @@ bar
     fn test_consolidate_required_time()
     {
         let special_required_times = vec![
-            DayTypeEntry{date: chrono::Local.ymd(2018, 5, 4), day_type: DayType::Holiday{name: "ho".to_string()}, given_as_range: false, line_nr: 1},
-            DayTypeEntry{date: chrono::Local.ymd(2018, 5, 6), day_type: DayType::Vacation{description: "A".to_string()}, given_as_range: false, line_nr: 5}];
+            DayTypeEntry{date: chrono::Local.ymd(2018, 5, 4), day_type: DayType::Holiday{name: "ho".to_string()},
+                         given_as_range: false, line_nr: 1},
+            DayTypeEntry{date: chrono::Local.ymd(2018, 5, 6), day_type: DayType::Vacation{description: "A".to_string()},
+                         given_as_range: true, line_nr: 5}];
         let full_day_duration = chrono::Duration::hours(7) + chrono::Duration::minutes(42);
-        let result = consolidate_required_time(&special_required_times, &chrono::Local.ymd(2018, 5, 3), &chrono::Local.ymd(2018, 5, 6), &full_day_duration);
+        let result = consolidate_required_time(&special_required_times, &chrono::Local.ymd(2018, 5, 3),
+                                               &chrono::Local.ymd(2018, 5, 6), &full_day_duration);
         let expected =
             Ok(vec![
                RequiredTime{date: chrono::Local.ymd(2018, 5, 3), day_type: DayType::WorkDay,
@@ -350,6 +362,60 @@ bar
 
                RequiredTime{date: chrono::Local.ymd(2018, 5, 6), day_type: DayType::Vacation{description: "A".to_string()},
                             required_time: chrono::Duration::hours(0), line_nr: 5},
+            ]);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_required_time_with_conflict_error_1()
+    {
+        let special_required_times = vec![
+            DayTypeEntry{date: chrono::Local.ymd(2018, 5, 4), day_type: DayType::Holiday{name: "ho".to_string()},
+                         given_as_range: false, line_nr: 1},
+            DayTypeEntry{date: chrono::Local.ymd(2018, 5, 4), day_type: DayType::Vacation{description: "A".to_string()},
+                         given_as_range: false, line_nr: 5}];
+        let full_day_duration = chrono::Duration::hours(7) + chrono::Duration::minutes(42);
+        let result = consolidate_required_time(&special_required_times, &chrono::Local.ymd(2018, 5, 3),
+                                               &chrono::Local.ymd(2018, 5, 5), &full_day_duration);
+        let expected = Err(Error::DuplicateDateError{file: "".to_string(), line_nr: 5});
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_required_time_with_conflict_error_2()
+    {
+        let special_required_times = vec![
+            DayTypeEntry{date: chrono::Local.ymd(2018, 5, 5), day_type: DayType::Vacation{description: "A".to_string()},
+                         given_as_range: false, line_nr: 5}];
+        let full_day_duration = chrono::Duration::hours(7) + chrono::Duration::minutes(42);
+        let result = consolidate_required_time(&special_required_times, &chrono::Local.ymd(2018, 5, 3),
+                                               &chrono::Local.ymd(2018, 5, 5), &full_day_duration);
+        let expected = Err(Error::DuplicateDateError{file: "".to_string(), line_nr: 5});
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_required_time_duplicate_without_conflict()
+    {
+        let special_required_times = vec![
+            DayTypeEntry{date: chrono::Local.ymd(2018, 5, 4), day_type: DayType::Holiday{name: "ho".to_string()},
+                         given_as_range: false, line_nr: 1},
+            DayTypeEntry{date: chrono::Local.ymd(2018, 5, 4), day_type: DayType::Vacation{description: "A".to_string()},
+                         given_as_range: true, line_nr: 5}];
+        let full_day_duration = chrono::Duration::hours(7) + chrono::Duration::minutes(42);
+        let result = consolidate_required_time(&special_required_times, &chrono::Local.ymd(2018, 5, 3),
+                                               &chrono::Local.ymd(2018, 5, 5), &full_day_duration);
+        let expected =
+            Ok(vec![
+               RequiredTime{date: chrono::Local.ymd(2018, 5, 3), day_type: DayType::WorkDay,
+                            required_time: full_day_duration, line_nr: 0},
+
+               RequiredTime{date: chrono::Local.ymd(2018, 5, 4), day_type: DayType::Holiday{name: "ho".to_string()},
+                            required_time: chrono::Duration::hours(0), line_nr: 1},
+
+               RequiredTime{date: chrono::Local.ymd(2018, 5, 5), day_type: DayType::WeekEnd,
+                            required_time: chrono::Duration::hours(0), line_nr: 0},
+
             ]);
         assert_eq!(result, expected);
     }
