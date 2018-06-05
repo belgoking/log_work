@@ -58,9 +58,12 @@ fn get_day_type_description(c: &regex::Captures) -> String {
     return c[5].to_string();
 }
 
-fn check_day_types(orig: &DayTypeEntry, new: &DayTypeEntry) -> Result<()>
+fn check_day_types(orig: &DayTypeEntry, new_entry: &DayTypeEntry) -> Result<()>
 {
-    if orig.date != new.date {
+    if orig.date != new_entry.date {
+        return Ok(());
+    }
+    if orig.day_type == DayType::WorkDay || new_entry.day_type == DayType::WorkDay {
         return Ok(());
     }
     if !orig.given_as_range && orig.day_type.to_day_type_class() != DayTypeClass::WeekendAndHolidays {
@@ -69,24 +72,28 @@ fn check_day_types(orig: &DayTypeEntry, new: &DayTypeEntry) -> Result<()>
             _ => { return Err(Error::DuplicateDateError{file: "".to_string() /*orig.file.clone()*/, line_nr: orig.line_nr}); },
         };
     }
-    if !new.given_as_range && new.day_type.to_day_type_class() != DayTypeClass::WeekendAndHolidays {
-        match new.day_type {
+    if !new_entry.given_as_range && new_entry.day_type.to_day_type_class() != DayTypeClass::WeekendAndHolidays {
+        match new_entry.day_type {
             DayType::JobTravel{description:_} => (),
-            _ => { return Err(Error::DuplicateDateError{file: "".to_string() /*new.file.clone()*/, line_nr: new.line_nr}); },
+            _ => { return Err(Error::DuplicateDateError{file: "".to_string() /*new_entry.file.clone()*/, line_nr: new_entry.line_nr}); },
         };
     }
     return Ok(());
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct RequiredTime {
-    date: Date,
-    day_type: DayType,
-    required_time: chrono::Duration,
-    line_nr: u32,
+pub struct RequiredTime {
+    pub date: Date,
+    pub day_type: DayType,
+    pub required_time: chrono::Duration,
+    pub line_nr: u32,
 }
 
-fn consolidate_required_time(raw_entries: &Vec<DayTypeEntry>, start_date: &Date, end_date: &Date, duration_of_day: &chrono::Duration) -> Result<Vec<RequiredTime>>
+pub fn consolidate_required_time(raw_entries: &Vec<DayTypeEntry>,
+                                 start_date: &Date,
+                                 end_date: &Date,
+                                 duration_of_day: &chrono::Duration)
+    -> Result<Vec<RequiredTime>>
 {
     let mut map: std::collections::BTreeMap<Date, DayTypeEntry> = std::collections::BTreeMap::new();
     for ref raw_entry in raw_entries {

@@ -6,12 +6,12 @@ use super::*;
 use self::util;
 use std;
 
-#[derive(Debug, Eq, PartialEq)]
-struct EntryRaw {
-    start_ts: DateTime,
-    key: String,
-    sub_keys: Vec<String>,
-    raw_data: String,
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EntryRaw {
+    pub start_ts: DateTime,
+    pub key: String,
+    pub sub_keys: Vec<String>,
+    pub raw_data: String,
 }
 
 #[derive(Debug)]
@@ -20,11 +20,11 @@ enum EntriesLine<'a> {
     Line,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone,Debug, Eq, PartialEq)]
 pub struct WorkDay {
-    date: Date,
-    entries: Vec<EntryRaw>,
-    additional_text: String,
+    pub date: Date,
+    pub entries: Vec<EntryRaw>,
+    pub additional_text: String,
 }
 
 impl WorkDay {
@@ -204,15 +204,14 @@ impl WorkDay {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-struct Day {
-    date: Date,
-    required_time: std::time::Duration,
-    work_day: WorkDay,
+pub struct Day {
+    pub required_time: required_time::RequiredTime,
+    pub work_day: WorkDay,
 }
 
 #[derive(Debug)]
 pub struct Days {
-    days: Vec<Day>
+    pub days: Vec<Day>
 }
 
 impl Days {
@@ -227,6 +226,26 @@ impl Days {
         return ret;
     }
 
+    pub fn join_work_and_requirement(work_days: &std::collections::BTreeMap<Date, WorkDay>,
+                                     required_times: &Vec<required_time::RequiredTime>)
+        -> Days
+    {
+        let mut days = Vec::new();
+        days.reserve_exact(required_times.len());
+        for ref required_time in required_times {
+            let work_day: WorkDay =
+                match work_days.get(&required_time.date) {
+                    Some(day) => (*day).clone(),
+                    None => WorkDay{date: required_time.date.clone(),
+                                    entries: Vec::new(),
+                                    additional_text: "".to_string()},
+                };
+
+            days.push(Day{required_time: (*required_time).clone(), work_day: work_day});
+        }
+
+        return Days{ days: days };
+    }
 //    pub fn load(mut files: Vec<std::path::PathBuf>, _special_dates_file: Option<String>) -> Days
 //    {
 //        // read work_files
