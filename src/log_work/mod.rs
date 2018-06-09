@@ -7,8 +7,9 @@ extern crate chrono;
 
 use std;
 
-type DateTime = chrono::DateTime<chrono::Local>;
 type Date = chrono::Date<chrono::Local>;
+type DateTime = chrono::DateTime<chrono::Local>;
+type Time = chrono::NaiveTime;
 
 #[derive(Debug)]
 pub enum Error {

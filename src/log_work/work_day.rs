@@ -7,11 +7,49 @@ use self::util;
 use std;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EntryRaw {
+struct EntryRaw {
     pub start_ts: DateTime,
     pub key: String,
     pub sub_keys: Vec<String>,
     pub raw_data: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Entry {
+    pub start_ts: Time,
+    pub duration: chrono::Duration,
+    pub key: String,
+    pub sub_keys: Vec<String>,
+    pub raw_data: String,
+}
+
+impl Entry {
+    fn from(entries: Vec<EntryRaw>) -> Vec<Entry> {
+        let mut ret = Vec::new();
+        ret.reserve_exact(entries.len());
+        if entries.is_empty() {
+            return ret;
+        }
+        let mut old_entry: Option<EntryRaw> = None;
+        for new_entry in entries {
+            old_entry =
+                match old_entry {
+                    Option::Some(old_entry) => {
+                        let duration = new_entry.start_ts.time() - old_entry.start_ts.time();
+                        ret.push(Entry{ start_ts: old_entry.start_ts.time(),
+                                        duration,
+                                        key: old_entry.key,
+                                        sub_keys: old_entry.sub_keys,
+                                        raw_data: old_entry.raw_data });
+                        Some(new_entry)
+                    },
+                    Option::None => {
+                        Some(new_entry)
+                    }
+                };
+        }
+        return ret;
+    }
 }
 
 #[derive(Debug)]
@@ -23,7 +61,7 @@ enum EntriesLine<'a> {
 #[derive(Clone,Debug, Eq, PartialEq)]
 pub struct WorkDay {
     pub date: Date,
-    pub entries: Vec<EntryRaw>,
+    pub entries: Vec<Entry>,
     pub additional_text: String,
 }
 
@@ -111,7 +149,10 @@ impl WorkDay {
             line = tmp_line;
         }
         match date {
-            Some(date) => Ok(WorkDay{date, entries, additional_text}),
+            Some(date) => {
+                let entries = Entry::from(entries);
+                Ok(WorkDay{date, entries, additional_text})
+            },
             None => Err(Error::MissingDateError{file: file.to_string()}),
         }
     }
@@ -201,12 +242,41 @@ impl WorkDay {
         let mut fstream = std::io::BufReader::new(file);
         return WorkDay::parse(&mut fstream, expected_date, file_name_str);
     }
+
+    pub fn compute_summary(&self) -> Summary
+    {
+        let mut ret = Summary::new();
+        for ref entry in &self.entries {
+            ret.entry(entry.key.clone())
+                .and_modify(|e| *e = *e + entry.duration)
+                .or_insert(entry.duration);
+        }
+        return ret;
+    }
+
+    pub fn merge_summaries(mut lhs: Summary, rhs: &Summary) -> Summary
+    {
+        for (k, v) in rhs.iter() {
+            lhs.entry(k.to_string())
+                .and_modify(|e| *e = *e + *v)
+                .or_insert(*v);
+        }
+        return lhs;
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Day {
     pub required_time: required_time::RequiredTime,
     pub work_day: WorkDay,
+}
+
+pub type Summary = std::collections::BTreeMap<String, chrono::Duration>;
+
+impl Day {
+    pub fn get_date(&self) -> Date {
+        return self.work_day.date.clone();
+    }
 }
 
 #[derive(Debug)]
@@ -246,6 +316,7 @@ impl Days {
 
         return Days{ days: days };
     }
+
 //    pub fn load(mut files: Vec<std::path::PathBuf>, _special_dates_file: Option<String>) -> Days
 //    {
 //        // read work_files

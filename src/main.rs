@@ -24,6 +24,10 @@ struct Opt {
     #[structopt(short="H", long="holidays", parse(from_os_str))]
     holidays: Option<std::path::PathBuf>,
 
+    /// Write debugging output
+    #[structopt(short="v", long="verbose")]
+    verbose: bool,
+
     /// The .work-files
     #[structopt(parse(from_os_str))]
     files: Vec<std::path::PathBuf>,
@@ -42,8 +46,11 @@ fn main() {
     let mut has_error = false;
     let mut work_day_by_date = std::collections::BTreeMap::new();
     for ref day_raw in &work_days_raw {
-        println!("Day: {:?}", day_raw);
-        if day_raw.is_err() {
+        if opt.verbose {
+            println!("Day: {:?}", day_raw);
+        }
+        if let Err(e) = day_raw {
+            println!("ERROR: {:?}", e);
             has_error = true;
             continue;
         }
@@ -79,10 +86,22 @@ fn main() {
                     .expect("Failed to consolidate required times")
             },
         };
-    println!("Required-times: {:?}", required_time);
+    if opt.verbose {
+        println!("Required-times: {:?}", required_time);
+    }
 
     let days = log_work::work_day::Days::join_work_and_requirement(&work_day_by_date, &required_time);
-    for ref day in days.days {
-        println!("Required-times for {:?}: {:?}", day.required_time.date, day);
+    if opt.verbose {
+        for ref day in &days.days {
+            println!("Required-times for {:?}: {:?}", day.required_time.date, day);
+        }
     }
+
+    let mut summary = log_work::work_day::Summary::new();
+    for ref day in &days.days {
+        let tmp_summary = day.work_day.compute_summary();
+        println!("Summary for day={:?}: {:?}", day.get_date(), tmp_summary);
+        summary = log_work::work_day::WorkDay::merge_summaries(summary, &tmp_summary);
+    }
+    println!("Summary for all days: {:?}", summary);
 }
