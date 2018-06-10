@@ -19,7 +19,9 @@ pub enum Error {
     ParseDayTypeError{file: String, line_nr: u32},
     TimeNotMonotonicError{file: String, line_nr: u32},
     DuplicateDateError{file: String, line_nr: u32},
+    EntryAfterSeparatorError{file: String, line_nr: u32},
     MissingDateError{file: String},
+    MissingFinalPauseError{file: String},
     UnexpectedDateError{file: String, line_nr: u32,
         expected_date: Date,
         found_date: Date},
@@ -43,8 +45,13 @@ impl PartialEq for Error {
             (&Error::DuplicateDateError{file: ref s_file, line_nr: s_line_nr},
              &Error::DuplicateDateError{file: ref o_file, line_nr: o_line_nr}) =>
                  (s_file==o_file && s_line_nr==o_line_nr),
+            (&Error::EntryAfterSeparatorError{file: ref s_file, line_nr: s_line_nr},
+             &Error::EntryAfterSeparatorError{file: ref o_file, line_nr: o_line_nr}) =>
+                 (s_file==o_file && s_line_nr==o_line_nr),
             (&Error::MissingDateError{file: ref s_file},
              &Error::MissingDateError{file: ref o_file}) => (s_file==o_file),
+            (&Error::MissingFinalPauseError{file: ref s_file},
+             &Error::MissingFinalPauseError{file: ref o_file}) => (s_file==o_file),
             (&Error::UnexpectedDateError{file: ref s_file, line_nr: s_line_nr,
                                          expected_date: ref s_expected_date,
                                          found_date: ref s_found_date},
@@ -71,8 +78,12 @@ impl std::fmt::Display for Error {
                 write!(f, "TimeNotMonotonicError: {}:{}", file, line_nr),
             Error::DuplicateDateError{ref file, ref line_nr} =>
                 write!(f, "DuplicateDateError: {}:{}", file, line_nr),
+            Error::EntryAfterSeparatorError{ref file, ref line_nr} =>
+                write!(f, "EntryAfterSeparatorError: {}:{}", file, line_nr),
             Error::MissingDateError{ref file} =>
                 write!(f, "MissingDateError: {}", file),
+            Error::MissingFinalPauseError{ref file} =>
+                write!(f, "MissingFinalPauseError: {}", file),
             Error::UnexpectedDateError{
                 ref file, ref line_nr,
                 ref expected_date, ref found_date} =>

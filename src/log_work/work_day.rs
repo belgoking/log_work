@@ -26,10 +26,10 @@ pub struct Entry {
 impl Entry {
     fn from(entries: Vec<EntryRaw>) -> Vec<Entry> {
         let mut ret = Vec::new();
-        ret.reserve_exact(entries.len());
         if entries.is_empty() {
             return ret;
         }
+        ret.reserve_exact(entries.len());
         let mut old_entry: Option<EntryRaw> = None;
         for new_entry in entries {
             old_entry =
@@ -48,6 +48,12 @@ impl Entry {
                     }
                 };
         }
+        let old_entry = old_entry.unwrap();
+        ret.push(Entry{ start_ts: old_entry.start_ts.time(),
+                        duration: chrono::Duration::minutes(0),
+                        key: old_entry.key,
+                        sub_keys: old_entry.sub_keys,
+                        raw_data: old_entry.raw_data });
         return ret;
     }
 }
@@ -145,9 +151,17 @@ impl WorkDay {
         }
         while !line.is_empty() {
             line_nr += 1;
+            if let EntriesLine::Captures(_) = WorkDay::parse_entries_line(&line) {
+                return Err(Error::EntryAfterSeparatorError{file: file.to_string(), line_nr});
+            }
             additional_text.push_str(&line[..]);
             let (_, tmp_line) = WorkDay::read_line(stream)?;
             line = tmp_line;
+        }
+        if !entries.is_empty() {
+            if &entries.get(entries.len()-1).unwrap().key != "Pause" {
+                return Err(Error::MissingFinalPauseError{file: file.to_string()});
+            }
         }
         match date {
             Some(date) => {
@@ -185,6 +199,9 @@ impl WorkDay {
             loop {
                 let (non_empty, line) = WorkDay::read_line(stream)?;
                 if !non_empty {
+                    if !line.is_empty() {
+                        *line_nr += 1;
+                    }
                     entries.push(entry_raw);
                     break;
                 }
@@ -426,11 +443,39 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_error_missing_final_pause()
+    {
+        let txt: &str = r"-- 2018-05-04 Mo 12:27 -- Foo
+-- 2018-05-04 Mo 12:29 -- Bar
+-- 2018-05-04 Mo 12:39 -- Baz";
+        let mut txt = io::BufReader::new(txt.as_bytes());
+        let entries = WorkDay::parse(&mut txt, None, "tst_file");
+        let expected_error =
+            Err(Error::MissingFinalPauseError{file: "tst_file".to_string()});
+        assert_eq!(expected_error, entries);
+    }
+
+    #[test]
+    fn test_parse_error_entry_after_separator()
+    {
+        let txt: &str = r"-- 2018-05-04 Mo 12:27 -- Foo
+-- 2018-05-04 Mo 12:29 -- Bar
+
+-- 2018-05-04 Mo 12:39 -- Baz";
+        let mut txt = io::BufReader::new(txt.as_bytes());
+        let entries = WorkDay::parse(&mut txt, None, "tst_file");
+        let expected_error =
+            Err(Error::EntryAfterSeparatorError{file: "tst_file".to_string(), line_nr: 4});
+        assert_eq!(expected_error, entries);
+    }
+
+    #[test]
     fn test_parse_entries_line_with_empty_lines()
     {
         let txt: &str = r"-- 2018-05-04 Mo 12:27 -- Foo
 Bar Baz
 -- 2018-05-04 Mo 12:47 -- Bam
+-- 2018-05-04 Mo 13:48 -- Pause Blah
 
 Hier kommt jetzt einfach nur noch geblubber
 ";
@@ -440,12 +485,19 @@ Hier kommt jetzt einfach nur noch geblubber
         assert!(parsed_entries.is_ok());
 
         let expected_entries = vec![
-            EntryRaw{ start_ts: chrono::Local.ymd(2018, 5, 4).and_hms(12, 27, 0),
+            Entry{ start_ts: Time::from_hms(12, 27, 0),
+                duration: chrono::Duration::minutes(20),
                 key: "Foo".to_string(), sub_keys: Vec::new(),
                 raw_data: "-- 2018-05-04 Mo 12:27 -- Foo\nBar Baz\n".to_string()},
-            EntryRaw{ start_ts: chrono::Local.ymd(2018, 5, 4).and_hms(12, 47, 0),
+            Entry{ start_ts: Time::from_hms(12, 47, 0),
+                duration: chrono::Duration::minutes(61),
                 key: "Bam".to_string(), sub_keys: Vec::new(),
-                raw_data: "-- 2018-05-04 Mo 12:47 -- Bam\n".to_string()}];
+                raw_data: "-- 2018-05-04 Mo 12:47 -- Bam\n".to_string()},
+            Entry{ start_ts: Time::from_hms(13, 48, 0),
+                duration: chrono::Duration::minutes(0),
+                key: "Pause".to_string(), sub_keys: Vec::new(),
+                raw_data: "-- 2018-05-04 Mo 13:48 -- Pause Blah\n".to_string()},
+            ];
         let expected = WorkDay{
             date: chrono::Local.ymd(2018, 5, 4),
             entries: expected_entries,
