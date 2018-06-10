@@ -90,7 +90,7 @@ fn main() {
         println!("Required-times: {:?}", required_time);
     }
 
-    let days = log_work::work_day::Days::join_work_and_requirement(&work_day_by_date, &required_time);
+    let days = log_work::work_day::Days::join_work_and_requirement(&work_day_by_date, &required_time, &duration_of_day);
     if opt.verbose {
         for ref day in &days.days {
             println!("Required-times for {:?}: {:?}", day.required_time.date, day);
@@ -99,9 +99,16 @@ fn main() {
 
     let mut summary = log_work::work_day::Summary::new();
     for ref day in &days.days {
-        let tmp_summary = day.work_day.compute_summary();
-        println!("Summary for day={:?}: {:?}", day.get_date(), tmp_summary);
-        summary = log_work::work_day::WorkDay::merge_summaries(summary, &tmp_summary);
+        println!("{}", log_work::work_day::DaySummary::wrap(&day));
+        log_work::work_day::WorkDay::merge_summaries_right_into_left(&mut summary, &day.work_day.compute_summary());
     }
-    println!("Summary for all days: {:?}", summary);
+    println!("Summary for all days:");
+    let mut sum = chrono::Duration::hours(0);
+    for (key, duration) in summary.iter() {
+        println!("{:20}: {}", key, log_work::work_day::WorkDuration{ duration_of_day, duration: *duration });
+        if key != "Pause" {
+            sum = sum + *duration;
+        }
+    }
+    println!("{:20}: {}", "Total", log_work::work_day::WorkDuration{ duration_of_day, duration: sum });
 }

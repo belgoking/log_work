@@ -14,6 +14,29 @@ struct EntryRaw {
     pub raw_data: String,
 }
 
+pub struct WorkDuration {
+    pub duration: chrono::Duration,
+    pub duration_of_day: chrono::Duration,
+}
+
+impl std::fmt::Display for WorkDuration {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut remaining_minutes = self.duration.num_minutes();
+        let days = remaining_minutes / self.duration_of_day.num_minutes();
+        if days > 0 { write!(f, "{:3}d", days)?; }
+        else { write!(f, "    ")?; }
+        remaining_minutes %= self.duration_of_day.num_minutes();
+        let hours = remaining_minutes / 60;
+        if hours > 0 { write!(f, " {:2}h", hours)?; }
+        else { write!(f, "    ")?; }
+        remaining_minutes %= 60;
+        let minutes = remaining_minutes;
+        if minutes > 0 { write!(f, " {:2}m", minutes)? }
+        else { write!(f, "    ")? }
+        return write!(f, " ({:>5.2}h)", (self.duration.num_minutes() as f64) / 60.);
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Entry {
     pub start_ts: Time,
@@ -51,6 +74,7 @@ impl Entry {
         return ret;
     }
 }
+
 
 #[derive(Debug)]
 enum EntriesLine<'a> {
@@ -254,28 +278,55 @@ impl WorkDay {
         return ret;
     }
 
-    pub fn merge_summaries(mut lhs: Summary, rhs: &Summary) -> Summary
+    pub fn merge_summaries_right_into_left(left: &mut Summary, right: &Summary)
     {
-        for (k, v) in rhs.iter() {
-            lhs.entry(k.to_string())
+        for (k, v) in right.iter() {
+            left.entry(k.to_string())
                 .and_modify(|e| *e = *e + *v)
                 .or_insert(*v);
         }
-        return lhs;
     }
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Day {
+    pub duration_of_day: chrono::Duration,
     pub required_time: required_time::RequiredTime,
     pub work_day: WorkDay,
 }
 
-pub type Summary = std::collections::BTreeMap<String, chrono::Duration>;
-
 impl Day {
     pub fn get_date(&self) -> Date {
         return self.work_day.date.clone();
+    }
+}
+
+pub type Summary = std::collections::BTreeMap<String, chrono::Duration>;
+
+
+pub struct DaySummary<'a> {
+    day: &'a Day,
+}
+
+impl<'a> DaySummary<'a> {
+    pub fn wrap(day: &'a Day) -> DaySummary<'a> {
+        return DaySummary{day};
+    }
+}
+
+impl<'a> std::fmt::Display for DaySummary<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Day={}\n", self.day.get_date().format("%Y-%m-%d"))?;
+        let duration_of_day = self.day.duration_of_day;
+        let mut sum = chrono::Duration::hours(0);
+        for (key, duration) in self.day.work_day.compute_summary().iter() {
+            write!(f, "{:20}: {}\n", key, WorkDuration{ duration_of_day, duration: *duration })?;
+            if key != "Pause" {
+                sum = sum + *duration;
+            }
+        }
+        write!(f, "{:20}: {}\n", "Total", WorkDuration{ duration_of_day, duration: sum })?;
+        return Ok(());
     }
 }
 
@@ -297,7 +348,8 @@ impl Days {
     }
 
     pub fn join_work_and_requirement(work_days: &std::collections::BTreeMap<Date, WorkDay>,
-                                     required_times: &Vec<required_time::RequiredTime>)
+                                     required_times: &Vec<required_time::RequiredTime>,
+                                     duration_of_day: &chrono::Duration)
         -> Days
     {
         let mut days = Vec::new();
@@ -311,7 +363,7 @@ impl Days {
                                     additional_text: "".to_string()},
                 };
 
-            days.push(Day{required_time: (*required_time).clone(), work_day: work_day});
+            days.push(Day{duration_of_day: *duration_of_day, required_time: (*required_time).clone(), work_day: work_day});
         }
 
         return Days{ days: days };
