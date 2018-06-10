@@ -277,13 +277,22 @@ pub type Summary = std::collections::BTreeMap<String, chrono::Duration>;
 
 pub struct DaySummary<'a> {
     pub day: &'a Day,
+    pub verbose: bool,
 }
 
 impl<'a> std::fmt::Display for DaySummary<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}\n", self.day.required_time)?;
-        let duration_of_day = self.day.duration_of_day;
+        if self.verbose {
+            for entry in &self.day.work_day.entries {
+                write!(f, "{} ({:>5.2}){}",
+                       &entry.raw_data[0..25],
+                       entry.duration.num_minutes() as f64 / 60.,
+                       &entry.raw_data[25..])?;
+            }
+        }
+        write!(f, "= {}\n", self.day.required_time)?;
         let mut sum = chrono::Duration::hours(0);
+        let duration_of_day = self.day.duration_of_day;
         for (key, duration) in self.day.work_day.compute_summary().iter() {
             write!(f, "{:20}: {}\n", key, util::WorkDuration{ duration_of_day, duration: *duration })?;
             if key != "Pause" {

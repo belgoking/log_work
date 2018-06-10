@@ -25,6 +25,10 @@ struct Opt {
     holidays: Option<std::path::PathBuf>,
 
     /// Write debugging output
+    #[structopt(short="d", long="debug")]
+    debug: bool,
+
+    /// Print more details
     #[structopt(short="v", long="verbose")]
     verbose: bool,
 
@@ -46,7 +50,7 @@ fn main() {
     let mut has_error = false;
     let mut work_day_by_date = std::collections::BTreeMap::new();
     for ref day_raw in &work_days_raw {
-        if opt.verbose {
+        if opt.debug {
             println!("Day: {:?}", day_raw);
         }
         if let Err(e) = day_raw {
@@ -70,7 +74,7 @@ fn main() {
                                                     let date = &day.as_ref().unwrap().date;
                                                     (std::cmp::min(min, *date), std::cmp::max(max, *date))
                                                 });
-    if opt.verbose {
+    if opt.debug {
         println!("min={} max={}", min_day.format("%Y-%m-%d"), max_day.format("%Y-%m-%d"));
     }
     let duration_of_day = chrono::Duration::hours(7) + chrono::Duration::minutes(42);
@@ -87,12 +91,12 @@ fn main() {
                     .expect("Failed to consolidate required times")
             },
         };
-    if opt.verbose {
+    if opt.debug {
         println!("Required-times: {:?}", required_time);
     }
 
     let days = log_work::work_day::Days::join_work_and_requirement(&work_day_by_date, &required_time, &duration_of_day);
-    if opt.verbose {
+    if opt.debug {
         for ref day in &days.days {
             println!("Required-times for {:?}: {:?}", day.required_time.date, day);
         }
@@ -101,7 +105,7 @@ fn main() {
     let mut summary = log_work::work_day::Summary::new();
     let mut sum_required = chrono::Duration::hours(0);
     for ref day in &days.days {
-        println!("= {}", log_work::work_day::DaySummary{day: &day});
+        println!("{}", log_work::work_day::DaySummary{day: &day, verbose: opt.verbose});
         log_work::work_day::WorkDay::merge_summaries_right_into_left(&mut summary, &day.work_day.compute_summary());
         sum_required = sum_required + day.required_time.required_time;
     }
