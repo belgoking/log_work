@@ -295,28 +295,16 @@ pub struct Day {
     pub work_day: WorkDay,
 }
 
-impl Day {
-    pub fn get_date(&self) -> Date {
-        return self.work_day.date.clone();
-    }
-}
-
 pub type Summary = std::collections::BTreeMap<String, chrono::Duration>;
 
 
 pub struct DaySummary<'a> {
-    day: &'a Day,
-}
-
-impl<'a> DaySummary<'a> {
-    pub fn wrap(day: &'a Day) -> DaySummary<'a> {
-        return DaySummary{day};
-    }
+    pub day: &'a Day,
 }
 
 impl<'a> std::fmt::Display for DaySummary<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Day={}\n", self.day.get_date().format("%Y-%m-%d"))?;
+        write!(f, "{}\n", self.day.required_time)?;
         let duration_of_day = self.day.duration_of_day;
         let mut sum = chrono::Duration::hours(0);
         for (key, duration) in self.day.work_day.compute_summary().iter() {
@@ -325,7 +313,7 @@ impl<'a> std::fmt::Display for DaySummary<'a> {
                 sum = sum + *duration;
             }
         }
-        write!(f, "{:20}: {}\n", "Total", WorkDuration{ duration_of_day, duration: sum })?;
+        write!(f, "{:20}: {}\n", " == Total ==", WorkDuration{ duration_of_day, duration: sum })?;
         return Ok(());
     }
 }

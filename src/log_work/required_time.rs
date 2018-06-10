@@ -41,6 +41,22 @@ impl DayType {
     }
 }
 
+impl std::fmt::Display for DayType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        return
+            match *self {
+                DayType::WorkDay => write!(f, "WorkDay"),
+                DayType::OvertimeReduction{description: ref s} => write!(f, "OvertimeReduction({})", s),
+                DayType::WeekEnd => write!(f, "WeekEnd"),
+                DayType::JobTravel{description: ref s} => write!(f, "JobTravel({})", s),
+                DayType::Sick{description: ref s} => write!(f, "Sick({})", s),
+                DayType::Holiday{name: ref s} => write!(f, "Holiday{})", s),
+                DayType::Vacation{description: ref s} => write!(f, "Vacation({})", s),
+                DayType::VacationHalfDay{description: ref s} => write!(f, "VacationHalfDay({})", s),
+            };
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DayTypeEntry {
     date: Date,
@@ -87,6 +103,29 @@ pub struct RequiredTime {
     pub day_type: DayType,
     pub required_time: chrono::Duration,
     pub line_nr: u32,
+}
+
+impl std::fmt::Display for RequiredTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        return
+            write!(f, "Day: {} Type: {} Required: {}",
+                   self.date.format("%Y-%m-%d"),
+                   self.day_type,
+                   HourMinuteDuration{duration: &self.required_time} );
+    }
+}
+
+pub struct HourMinuteDuration<'a> {
+    pub duration: &'a chrono::Duration,
+}
+
+impl<'a> std::fmt::Display for HourMinuteDuration<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        return
+            write!(f, "{:>2}:{:02}",
+                   self.duration.num_hours(),
+                   self.duration.num_minutes() % 60);
+    }
 }
 
 pub fn consolidate_required_time(raw_entries: &Vec<DayTypeEntry>,

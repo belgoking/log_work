@@ -70,7 +70,9 @@ fn main() {
                                                     let date = &day.as_ref().unwrap().date;
                                                     (std::cmp::min(min, *date), std::cmp::max(max, *date))
                                                 });
-    println!("min={} max={}", min_day, max_day);
+    if opt.verbose {
+        println!("min={} max={}", min_day.format("%Y-%m-%d"), max_day.format("%Y-%m-%d"));
+    }
     let duration_of_day = chrono::Duration::hours(7) + chrono::Duration::minutes(42);
     let required_time =
         match opt.holidays {
@@ -98,11 +100,14 @@ fn main() {
     }
 
     let mut summary = log_work::work_day::Summary::new();
+    let mut sum_required = chrono::Duration::hours(0);
     for ref day in &days.days {
-        println!("{}", log_work::work_day::DaySummary::wrap(&day));
+        println!("= {}", log_work::work_day::DaySummary{day: &day});
         log_work::work_day::WorkDay::merge_summaries_right_into_left(&mut summary, &day.work_day.compute_summary());
+        sum_required = sum_required + day.required_time.required_time;
     }
-    println!("Summary for all days:");
+    println!("= Summary for all days: Required: {}",
+             log_work::work_day::WorkDuration{duration: sum_required, duration_of_day});
     let mut sum = chrono::Duration::hours(0);
     for (key, duration) in summary.iter() {
         println!("{:20}: {}", key, log_work::work_day::WorkDuration{ duration_of_day, duration: *duration });
@@ -110,5 +115,5 @@ fn main() {
             sum = sum + *duration;
         }
     }
-    println!("{:20}: {}", "Total", log_work::work_day::WorkDuration{ duration_of_day, duration: sum });
+    println!("{:20}: {}", " == Total ==", log_work::work_day::WorkDuration{ duration_of_day, duration: sum });
 }
