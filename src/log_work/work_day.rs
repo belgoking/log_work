@@ -14,29 +14,6 @@ struct EntryRaw {
     pub raw_data: String,
 }
 
-pub struct WorkDuration {
-    pub duration: chrono::Duration,
-    pub duration_of_day: chrono::Duration,
-}
-
-impl std::fmt::Display for WorkDuration {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut remaining_minutes = self.duration.num_minutes();
-        let days = remaining_minutes / self.duration_of_day.num_minutes();
-        if days > 0 { write!(f, "{:3}d", days)?; }
-        else { write!(f, "    ")?; }
-        remaining_minutes %= self.duration_of_day.num_minutes();
-        let hours = remaining_minutes / 60;
-        if hours > 0 { write!(f, " {:2}h", hours)?; }
-        else { write!(f, "    ")?; }
-        remaining_minutes %= 60;
-        let minutes = remaining_minutes;
-        if minutes > 0 { write!(f, " {:2}m", minutes)? }
-        else { write!(f, "    ")? }
-        return write!(f, " ({:>5.2}h)", (self.duration.num_minutes() as f64) / 60.);
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Entry {
     pub start_ts: Time,
@@ -308,12 +285,12 @@ impl<'a> std::fmt::Display for DaySummary<'a> {
         let duration_of_day = self.day.duration_of_day;
         let mut sum = chrono::Duration::hours(0);
         for (key, duration) in self.day.work_day.compute_summary().iter() {
-            write!(f, "{:20}: {}\n", key, WorkDuration{ duration_of_day, duration: *duration })?;
+            write!(f, "{:20}: {}\n", key, util::WorkDuration{ duration_of_day, duration: *duration })?;
             if key != "Pause" {
                 sum = sum + *duration;
             }
         }
-        write!(f, "{:20}: {}\n", " == Total ==", WorkDuration{ duration_of_day, duration: sum })?;
+        write!(f, "{:20}: {}\n", " == Total ==", util::WorkDuration{ duration_of_day, duration: sum })?;
         return Ok(());
     }
 }

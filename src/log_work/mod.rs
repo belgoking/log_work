@@ -1,6 +1,6 @@
 pub mod required_time;
 pub mod work_day;
-mod util;
+pub mod util;
 
 extern crate chrono;
 //use chrono::TimeZone;

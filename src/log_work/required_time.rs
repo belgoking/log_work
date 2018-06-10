@@ -111,20 +111,7 @@ impl std::fmt::Display for RequiredTime {
             write!(f, "Day: {} Type: {} Required: {}",
                    self.date.format("%Y-%m-%d"),
                    self.day_type,
-                   HourMinuteDuration{duration: &self.required_time} );
-    }
-}
-
-pub struct HourMinuteDuration<'a> {
-    pub duration: &'a chrono::Duration,
-}
-
-impl<'a> std::fmt::Display for HourMinuteDuration<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        return
-            write!(f, "{:>2}:{:02}",
-                   self.duration.num_hours(),
-                   self.duration.num_minutes() % 60);
+                   util::HourMinuteDuration{duration: &self.required_time} );
     }
 }
 

@@ -83,7 +83,6 @@ fn main() {
             },
             None => {
                 let empty = Vec::new();
-//                let empty = Vec<log_work::required_time::DayTypeEntry>::new();
                 log_work::required_time::consolidate_required_time(&empty, &min_day, &max_day, &duration_of_day)
                     .expect("Failed to consolidate required times")
             },
@@ -107,13 +106,13 @@ fn main() {
         sum_required = sum_required + day.required_time.required_time;
     }
     println!("= Summary for all days: Required: {}",
-             log_work::work_day::WorkDuration{duration: sum_required, duration_of_day});
+             log_work::util::WorkDuration{duration: sum_required, duration_of_day});
     let mut sum = chrono::Duration::hours(0);
     for (key, duration) in summary.iter() {
-        println!("{:20}: {}", key, log_work::work_day::WorkDuration{ duration_of_day, duration: *duration });
+        println!("{:20}: {}", key, log_work::util::WorkDuration{ duration_of_day, duration: *duration });
         if key != "Pause" {
             sum = sum + *duration;
         }
     }
-    println!("{:20}: {}", " == Total ==", log_work::work_day::WorkDuration{ duration_of_day, duration: sum });
+    println!("{:20}: {}", " == Total ==", log_work::util::WorkDuration{ duration_of_day, duration: sum });
 }
