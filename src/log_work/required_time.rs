@@ -109,7 +109,7 @@ impl std::fmt::Display for RequiredTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         return
             write!(f, "Day: {} Type: {} Required: {}",
-                   self.date.format("%Y-%m-%d"),
+                   self.date.format("%F (%a)"),
                    self.day_type,
                    util::HourMinuteDuration{duration: &self.required_time} );
     }

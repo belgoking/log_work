@@ -8,12 +8,9 @@ mod log_work;
 use structopt::StructOpt;
 
 /** TODO
- * Collect sub-keys
- * Collect and sum up the entries of one day
- * Create aggregate of several days
- * Collect and sum up the entries of several days
- * Handle flexible required durations per day
- * Handle vacations/half-day-vacations/sickness/holidays/conferences
+ * Return error if day does not end on Pause
+ * Unittests for aggregating functions
+ * Unittests for erronuous files
  */
 
 #[derive(Debug, StructOpt)]
@@ -75,7 +72,7 @@ fn main() {
                                                     (std::cmp::min(min, *date), std::cmp::max(max, *date))
                                                 });
     if opt.debug {
-        println!("min={} max={}", min_day.format("%Y-%m-%d"), max_day.format("%Y-%m-%d"));
+        println!("min={} max={}", min_day.format("%F"), max_day.format("%F"));
     }
     let duration_of_day = chrono::Duration::hours(7) + chrono::Duration::minutes(42);
     let required_time =
