@@ -7,6 +7,8 @@ mod log_work;
 
 use structopt::StructOpt;
 
+use std::io::BufRead;
+
 /** TODO
  * Return error if day does not end on Pause
  * Unittests for aggregating functions
@@ -35,9 +37,35 @@ struct Opt {
 }
 
 fn main() {
-    let opt = Opt::from_args();
+    let mut opt_from_file = if let Ok(home) = std::env::var("HOME") {
+            let rc_file = home + "/.log_work.rc";
+            if let Ok(f) = std::fs::File::open(rc_file) {
+                let mut lines: Vec<String> = std::io::BufReader::new(f).lines().map(|e| e.unwrap()).collect();
+                lines.insert(0, "DUMMY".to_string()); // normally the first element holds the program name
+                Opt::from_iter(lines.iter())
+            } else {
+                Opt{holidays: None, debug: false, verbose: false, files: Vec::new()}
+            }
+        } else {
+            Opt{holidays: None, debug: false, verbose: false, files: Vec::new()}
+        };
+    let opt_from_args = Opt::from_args();
 
+    if opt_from_args.debug || opt_from_file.debug {
+        println!("file={:?} cmd={:?}", opt_from_file, opt_from_args);
+    }
+    let mut files = opt_from_args.files;
+    files.append(&mut opt_from_file.files);
+    let opt = Opt{
+            holidays: if let Some(h) = opt_from_args.holidays { Some(h) } else { opt_from_file.holidays },
+            debug: opt_from_args.debug || opt_from_file.debug,
+            verbose: opt_from_args.verbose || opt_from_file.verbose,
+            files: files
+        };
 
+    if opt.debug {
+        println!("opt={:?}", opt);
+    }
     let work_days_raw = log_work::work_day::Days::parse_work_files(opt.files);
     if work_days_raw.is_empty() {
         println!("No days given, aborting!");
