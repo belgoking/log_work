@@ -301,7 +301,7 @@ impl<'a> std::fmt::Display for DaySummary<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if self.verbose {
             for entry in &self.day.work_day.entries {
-                write!(f, "{} ({:>5.2}){}",
+                write!(f, "{} ({:>5.2}h){}",
                        &entry.raw_data[0..25],
                        entry.duration.num_minutes() as f64 / 60.,
                        &entry.raw_data[25..])?;
