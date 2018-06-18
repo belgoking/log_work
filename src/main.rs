@@ -31,6 +31,10 @@ struct Opt {
     #[structopt(short="v", long="verbose")]
     verbose: bool,
 
+    /// Don't abort on some errors. Especially don't abort if a day does not end on a pause.
+    #[structopt(short="l", long="lenient")]
+    be_lenient: bool,
+
     /// The .work-files
     #[structopt(parse(from_os_str))]
     files: Vec<std::path::PathBuf>,
@@ -44,10 +48,10 @@ fn main() {
                 lines.insert(0, "DUMMY".to_string()); // normally the first element holds the program name
                 Opt::from_iter(lines.iter())
             } else {
-                Opt{holidays: None, debug: false, verbose: false, files: Vec::new()}
+                Opt{holidays: None, debug: false, verbose: false, be_lenient: false, files: Vec::new()}
             }
         } else {
-            Opt{holidays: None, debug: false, verbose: false, files: Vec::new()}
+            Opt{holidays: None, debug: false, verbose: false, be_lenient: false, files: Vec::new()}
         };
     let opt_from_args = Opt::from_args();
 
@@ -60,13 +64,14 @@ fn main() {
             holidays: if let Some(h) = opt_from_args.holidays { Some(h) } else { opt_from_file.holidays },
             debug: opt_from_args.debug || opt_from_file.debug,
             verbose: opt_from_args.verbose || opt_from_file.verbose,
+            be_lenient: opt_from_args.be_lenient || opt_from_file.be_lenient,
             files: files
         };
 
     if opt.debug {
         println!("opt={:?}", opt);
     }
-    let work_days_raw = log_work::work_day::Days::parse_work_files(opt.files);
+    let work_days_raw = log_work::work_day::Days::parse_work_files(opt.files, opt.be_lenient);
     if work_days_raw.is_empty() {
         println!("No days given, aborting!");
         return;

@@ -115,7 +115,7 @@ impl WorkDay {
         Ok(EntryRaw{start_ts, key, sub_keys, raw_data: raw_data.to_string()})
     }
 
-    pub fn parse(stream: &mut std::io::BufRead, expected_date: Option<Date>, file: &str) -> Result<WorkDay>
+    pub fn parse(stream: &mut std::io::BufRead, expected_date: Option<Date>, be_lenient: bool, file: &str) -> Result<WorkDay>
     {
         let mut line_nr = 0u32;
         let date: Option<Date>;
@@ -160,7 +160,12 @@ impl WorkDay {
         }
         if !entries.is_empty() {
             if &entries.get(entries.len()-1).unwrap().key != "Pause" {
-                return Err(Error::MissingFinalPauseError{file: file.to_string()});
+                if be_lenient {
+                    // TODO: log a warning using a logger
+                    println!("WARNING: Missing 'Pause' as last entry for the day for file '{}'!", file);
+                } else {
+                    return Err(Error::MissingFinalPauseError{file: file.to_string()});
+                }
             }
         }
         match date {
@@ -234,7 +239,7 @@ impl WorkDay {
         return Ok(entries);
     }
 
-    pub fn parse_file(file_name: &std::path::PathBuf) -> Result<WorkDay> {
+    pub fn parse_file(file_name: &std::path::PathBuf, be_lenient: bool) -> Result<WorkDay> {
         lazy_static!{
               static ref RE: regex::Regex = regex::Regex::new(r"(^|/)(\d{4})(\d{2})(\d{2})(_.*)\.work$").expect("Erronuous Regular Expression");
         }
@@ -258,7 +263,7 @@ impl WorkDay {
         };
         let file = std::fs::File::open(file_name)?;
         let mut fstream = std::io::BufReader::new(file);
-        return WorkDay::parse(&mut fstream, expected_date, file_name_str);
+        return WorkDay::parse(&mut fstream, expected_date, be_lenient, file_name_str);
     }
 
     pub fn compute_summary(&self) -> Summary
@@ -327,13 +332,13 @@ pub struct Days {
 }
 
 impl Days {
-    pub fn parse_work_files(mut files: Vec<std::path::PathBuf>) -> Vec<Result<WorkDay>>
+    pub fn parse_work_files(mut files: Vec<std::path::PathBuf>, be_lenient: bool) -> Vec<Result<WorkDay>>
     {
         files.sort();
         let mut ret: Vec<Result<WorkDay>> = Vec::new();
         ret.reserve_exact(files.len());
         for ref file in files {
-            ret.push(WorkDay::parse_file(file));
+            ret.push(WorkDay::parse_file(file, be_lenient));
         }
         return ret;
     }
@@ -384,7 +389,7 @@ mod tests {
         let txt = txt.as_bytes();
         let mut txt = io::BufReader::new(txt);
         let expected_date = chrono::Local.ymd(2018, 5, 3);
-        let entries = WorkDay::parse(&mut txt, Some(expected_date), "tst_file");
+        let entries = WorkDay::parse(&mut txt, Some(expected_date), false, "tst_file");
         let expected_error =
             Err(Error::UnexpectedDateError{
                     file: "tst_file".to_string(), line_nr: 1,
@@ -402,7 +407,7 @@ mod tests {
         let txt = txt.as_bytes();
         let mut txt = io::BufReader::new(txt);
         let expected_date = chrono::Local.ymd(2018, 5, 3);
-        let entries = WorkDay::parse(&mut txt, Some(expected_date), "tst_file");
+        let entries = WorkDay::parse(&mut txt, Some(expected_date), false, "tst_file");
         let expected_error =
             Err(Error::UnexpectedDateError{
                     file: "tst_file".to_string(), line_nr: 3,
@@ -420,7 +425,7 @@ mod tests {
         let txt = txt.as_bytes();
         let mut txt = io::BufReader::new(txt);
         let expected_date = chrono::Local.ymd(2018, 5, 3);
-        let entries = WorkDay::parse(&mut txt, Some(expected_date), "tst_file");
+        let entries = WorkDay::parse(&mut txt, Some(expected_date), false, "tst_file");
         let expected_error =
             Err(Error::UnexpectedDateError{
                     file: "tst_file".to_string(), line_nr: 3,
@@ -435,23 +440,10 @@ mod tests {
         let txt: &str = r"-- 2018-05-04 Mo 12:27 -- Foo Bar Baz
 -- 2018-05-04 Mo 12:26 -- Foo Bar Baz";
         let mut txt = io::BufReader::new(txt.as_bytes());
-        let entries = WorkDay::parse(&mut txt, None, "tst_file");
+        let entries = WorkDay::parse(&mut txt, None, false, "tst_file");
         let expected_error =
             Err(Error::TimeNotMonotonicError{
                     file: "tst_file".to_string(), line_nr: 2});
-        assert_eq!(expected_error, entries);
-    }
-
-    #[test]
-    fn test_parse_error_missing_final_pause()
-    {
-        let txt: &str = r"-- 2018-05-04 Mo 12:27 -- Foo
--- 2018-05-04 Mo 12:29 -- Bar
--- 2018-05-04 Mo 12:39 -- Baz";
-        let mut txt = io::BufReader::new(txt.as_bytes());
-        let entries = WorkDay::parse(&mut txt, None, "tst_file");
-        let expected_error =
-            Err(Error::MissingFinalPauseError{file: "tst_file".to_string()});
         assert_eq!(expected_error, entries);
     }
 
@@ -463,10 +455,54 @@ mod tests {
 
 -- 2018-05-04 Mo 12:39 -- Baz";
         let mut txt = io::BufReader::new(txt.as_bytes());
-        let entries = WorkDay::parse(&mut txt, None, "tst_file");
+        let entries = WorkDay::parse(&mut txt, None, false, "tst_file");
         let expected_error =
             Err(Error::EntryAfterSeparatorError{file: "tst_file".to_string(), line_nr: 4});
         assert_eq!(expected_error, entries);
+    }
+
+    #[test]
+    fn test_parse_error_missing_final_pause()
+    {
+        let txt: &str = r"-- 2018-05-04 Mo 12:27 -- Foo
+-- 2018-05-04 Mo 12:29 -- Bar
+-- 2018-05-04 Mo 12:39 -- Baz";
+        let mut txt = io::BufReader::new(txt.as_bytes());
+        let entries = WorkDay::parse(&mut txt, None, false, "tst_file");
+        let expected_error =
+            Err(Error::MissingFinalPauseError{file: "tst_file".to_string()});
+        assert_eq!(expected_error, entries);
+    }
+
+    #[test]
+    fn test_parse_missing_final_pause_in_lenient_mode()
+    {
+        let txt: &str = r"-- 2018-05-04 Mo 12:27 -- Foo
+-- 2018-05-04 Mo 12:29 -- Bar
+-- 2018-05-04 Mo 12:39 -- Baz";
+        let mut txt = io::BufReader::new(txt.as_bytes());
+        let parsed_entries = WorkDay::parse(&mut txt, None, true, "tst_file");
+        assert!(parsed_entries.is_ok());
+
+        let expected_entries = vec![
+            Entry{ start_ts: Time::from_hms(12, 27, 0),
+                duration: chrono::Duration::minutes(2),
+                key: "Foo".to_string(), sub_keys: Vec::new(),
+                raw_data: "-- 2018-05-04 Mo 12:27 -- Foo\n".to_string()},
+            Entry{ start_ts: Time::from_hms(12, 29, 0),
+                duration: chrono::Duration::minutes(10),
+                key: "Bar".to_string(), sub_keys: Vec::new(),
+                raw_data: "-- 2018-05-04 Mo 12:29 -- Bar\n".to_string()},
+            Entry{ start_ts: Time::from_hms(12, 39, 0),
+                duration: chrono::Duration::minutes(0),
+                key: "Baz".to_string(), sub_keys: Vec::new(),
+                raw_data: "-- 2018-05-04 Mo 12:39 -- Baz".to_string()},
+            ];
+        let expected = WorkDay{
+            date: chrono::Local.ymd(2018, 5, 4),
+            entries: expected_entries,
+            additional_text: String::new()};
+        assert_eq!(parsed_entries.unwrap(), expected);
     }
 
     #[test]
@@ -481,7 +517,7 @@ Hier kommt jetzt einfach nur noch geblubber
 ";
         let txt = txt.as_bytes();
         let mut txt = io::BufReader::new(txt);
-        let parsed_entries = WorkDay::parse(&mut txt, None, "tst_file");
+        let parsed_entries = WorkDay::parse(&mut txt, None, false, "tst_file");
         assert!(parsed_entries.is_ok());
 
         let expected_entries = vec![
