@@ -13,6 +13,7 @@ type Time = chrono::NaiveTime;
 
 #[derive(Debug)]
 pub enum Error {
+    CommandLineError(String),
     IOError(std::io::Error),
     ParseIntError(std::num::ParseIntError),
     InvalidFileNameError{file: std::path::PathBuf},
@@ -31,6 +32,7 @@ impl PartialEq for Error {
     fn eq(&self, other: &Error) -> bool {
         use self::Error;
         match (self, other) {
+            (&Error::CommandLineError(ref s), &Error::CommandLineError(ref o)) => s==o,
             (&Error::IOError(_), &Error::IOError(_)) => true,
             (&Error::ParseIntError(_), &Error::ParseIntError(_)) => true,
             (&Error::InvalidFileNameError{file: ref s_file},
@@ -68,6 +70,7 @@ impl PartialEq for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
+            Error::CommandLineError(ref s) => write!(f, "CommandLineError: {}", s),
             Error::IOError(ref err) => write!(f, "IOError: {}", err),
             Error::ParseIntError(ref err) => write!(f, "ParseIntError: {}", err),
             Error::InvalidFileNameError{ref file} =>

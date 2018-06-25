@@ -15,6 +15,21 @@ use std::io::BufRead;
  * Unittests for erronuous files
  */
 
+fn parse_duration(s: &str) -> Result<chrono::Duration, log_work::Error> {
+    println!("s: '{}'", s);
+    let re = regex::Regex::new(r"^((\d+)h)? ?((\d+)m)?$").expect("broken regular expression");
+    match re.captures(s) {
+        Some(c) => {
+            let h = c.get(2).map_or("0", |m| m.as_str());
+            let h = h.parse::<i64>()?;
+            let m = c.get(4).map_or("0", |m| m.as_str());
+            let m = m.parse::<i64>()?;
+            return Ok(chrono::Duration::hours(h) + chrono::Duration::minutes(m));
+        },
+        None => return Err(log_work::Error::CommandLineError("Command line argument did not have the form '<hours>h <minutes>m'".to_string()))
+    }
+}
+
 #[derive(Debug, StructOpt)]
 #[structopt(about="Read .work-files and give summaries of worked time.")]
 #[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
@@ -35,6 +50,11 @@ struct Opt {
     #[structopt(short="l", long="lenient")]
     be_lenient: bool,
 
+    /// The duration of a work-day matching the expressoin '(\d+h)? ?(\d+m)?' with the first part
+    /// denominating the hours and the second part the minutes.
+    #[structopt(short="u", long="duration_of_day", parse(try_from_str="parse_duration"))]
+    duration_of_day: Option<chrono::Duration>,
+
     /// The .work-files
     #[structopt(parse(from_os_str))]
     files: Vec<std::path::PathBuf>,
@@ -48,10 +68,10 @@ fn main() {
                 lines.insert(0, "DUMMY".to_string()); // normally the first element holds the program name
                 Opt::from_iter(lines.iter())
             } else {
-                Opt{holidays: None, debug: false, verbose: false, be_lenient: false, files: Vec::new()}
+                Opt{holidays: None, debug: false, verbose: false, be_lenient: false, duration_of_day: None, files: Vec::new()}
             }
         } else {
-            Opt{holidays: None, debug: false, verbose: false, be_lenient: false, files: Vec::new()}
+            Opt{holidays: None, debug: false, verbose: false, be_lenient: false, duration_of_day: None, files: Vec::new()}
         };
     let opt_from_args = Opt::from_args();
 
@@ -65,6 +85,7 @@ fn main() {
             debug: opt_from_args.debug || opt_from_file.debug,
             verbose: opt_from_args.verbose || opt_from_file.verbose,
             be_lenient: opt_from_args.be_lenient || opt_from_file.be_lenient,
+            duration_of_day: if let Some(d) = opt_from_args.duration_of_day { Some(d) } else { opt_from_file.duration_of_day },
             files: files
         };
 
@@ -107,7 +128,7 @@ fn main() {
     if opt.debug {
         println!("min={} max={}", min_day.format("%F"), max_day.format("%F"));
     }
-    let duration_of_day = chrono::Duration::hours(7) + chrono::Duration::minutes(42);
+    let duration_of_day = if let Some(d) = opt.duration_of_day { d } else {chrono::Duration::hours(7) + chrono::Duration::minutes(42) };
     let required_time =
         match opt.holidays {
             Some(fp) => {
