@@ -128,7 +128,7 @@ fn main() {
     if opt.debug {
         println!("min={} max={}", min_day.format("%F"), max_day.format("%F"));
     }
-    let duration_of_day = if let Some(d) = opt.duration_of_day { d } else {chrono::Duration::hours(7) + chrono::Duration::minutes(42) };
+    let duration_of_day = if let Some(d) = opt.duration_of_day { d } else { chrono::Duration::hours(8) };
     let required_time =
         match opt.holidays {
             Some(fp) => {
