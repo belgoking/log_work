@@ -219,13 +219,13 @@ pub fn parse_required_time_file(file_name: &std::path::PathBuf) -> Result<Vec<Da
 
 fn day_type_from_str(s: &str, file_name: &str, line_nr: u32) -> Result<DayType> {
     lazy_static!{
-        static ref RE: regex::Regex = regex::Regex::new(r"^([DKFUHÜ]) +((([^:]*):)|([^ ]*)).*$")
+        static ref RE: regex::Regex = regex::Regex::new(r"^([WKFUHÜ]) +((([^:]*):)|([^ ]*)).*$")
             .expect("Erronuous Regular Expression for holiday type parsing");
     }
     match RE.captures(s) {
         Some(c) => {
             match &c[1] {
-                "D" => return Ok(DayType::JobTravel{description: get_day_type_description(&c)}),
+                "W" => return Ok(DayType::JobTravel{description: get_day_type_description(&c)}),
                 "K" => return Ok(DayType::Sick{description: get_day_type_description(&c)}),
                 "F" => return Ok(DayType::Holiday{name: get_day_type_description(&c)}),
                 "U" => return Ok(DayType::Vacation{description: get_day_type_description(&c)}),
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn test_parse_required_time_1()
     {
-        let txt: &str = r"2018-05-04 -- D Mehrere Worte:";
+        let txt: &str = r"2018-05-04 -- W Mehrere Worte:";
         let expected = Ok(vec![
             DayTypeEntry{date: chrono::Local.ymd(2018, 5, 4), day_type: DayType::JobTravel{description: "Mehrere Worte".to_string()}, given_as_range: false, line_nr: 1}]);
         do_test_parse_required_time(txt, expected);

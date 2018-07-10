@@ -16,7 +16,6 @@ use std::io::BufRead;
  */
 
 fn parse_duration(s: &str) -> Result<chrono::Duration, log_work::Error> {
-    println!("s: '{}'", s);
     let re = regex::Regex::new(r"^((\d+)h)? ?((\d+)m)?$").expect("broken regular expression");
     match re.captures(s) {
         Some(c) => {
@@ -134,7 +133,7 @@ fn main() {
             Some(fp) => {
                 let required_time = log_work::required_time::parse_required_time_file(&fp).expect("Error parsing required time file");
                 log_work::required_time::consolidate_required_time(&required_time, &min_day, &max_day, &duration_of_day)
-                    .expect("Failed to consolidate required times")
+                   .expect("Failed to consolidate required times")
             },
             None => {
                 let empty = Vec::new();
