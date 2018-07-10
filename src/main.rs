@@ -16,9 +16,7 @@ const APP_INFO: app_dirs::AppInfo = app_dirs::AppInfo {
 };
 
 /** TODO
- * Return error if day does not end on Pause
  * Unittests for aggregating functions
- * Unittests for erronuous files
  */
 
 fn parse_duration(s: &str) -> Result<chrono::Duration, log_work::Error> {
