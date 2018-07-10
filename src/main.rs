@@ -2,12 +2,18 @@ extern crate chrono;
 #[macro_use] extern crate lazy_static;
 extern crate regex;
 #[macro_use] extern crate structopt;
+extern crate app_dirs;
 
 mod log_work;
 
 use structopt::StructOpt;
 
 use std::io::BufRead;
+
+const APP_INFO: app_dirs::AppInfo = app_dirs::AppInfo {
+    name: "log_work",
+    author: "Tobias Kölsch",
+};
 
 /** TODO
  * Return error if day does not end on Pause
@@ -60,8 +66,8 @@ struct Opt {
 }
 
 fn main() {
-    let mut opt_from_file = if let Ok(home) = std::env::var("HOME") {
-            let rc_file = home + "/.log_work.rc";
+    let mut opt_from_file = if let Ok(mut rc_file) = app_dirs::get_app_root(app_dirs::AppDataType::UserConfig, &APP_INFO) {
+            rc_file.push("log_work.rc");
             if let Ok(f) = std::fs::File::open(rc_file) {
                 let mut lines: Vec<String> = std::io::BufReader::new(f).lines().map(|e| e.unwrap()).collect();
                 lines.insert(0, "DUMMY".to_string()); // normally the first element holds the program name

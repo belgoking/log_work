@@ -50,7 +50,7 @@ impl std::fmt::Display for DayType {
                 DayType::WeekEnd => write!(f, "WeekEnd"),
                 DayType::JobTravel{description: ref s} => write!(f, "JobTravel({})", s),
                 DayType::Sick{description: ref s} => write!(f, "Sick({})", s),
-                DayType::Holiday{name: ref s} => write!(f, "Holiday{})", s),
+                DayType::Holiday{name: ref s} => write!(f, "Holiday({})", s),
                 DayType::Vacation{description: ref s} => write!(f, "Vacation({})", s),
                 DayType::VacationHalfDay{description: ref s} => write!(f, "VacationHalfDay({})", s),
             };
