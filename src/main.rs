@@ -165,14 +165,16 @@ fn main() {
         log_work::work_day::WorkDay::merge_summaries_right_into_left(&mut summary, &day.work_day.compute_summary());
         sum_required = sum_required + day.required_time.required_time;
     }
-    println!("= Summary for all days: Required: {}",
-             log_work::util::WorkDuration{duration: sum_required, duration_of_day});
-    let mut sum = chrono::Duration::hours(0);
-    for (key, duration) in summary.iter() {
-        println!("{:20}: {}", key, log_work::util::WorkDuration{ duration_of_day, duration: *duration });
-        if key != "Pause" {
-            sum = sum + *duration;
+    if days.days.len() > 1 {
+        println!("= Summary for all days: Required: {}",
+                 log_work::util::WorkDuration{duration: sum_required, duration_of_day});
+        let mut sum = chrono::Duration::hours(0);
+        for (key, duration) in summary.iter() {
+            println!("{:20}: {}", key, log_work::util::WorkDuration{ duration_of_day, duration: *duration });
+            if key != "Pause" {
+                sum = sum + *duration;
+            }
         }
+        println!("{:20}: {}", " == Total ==", log_work::util::WorkDuration{ duration_of_day, duration: sum });
     }
-    println!("{:20}: {}", " == Total ==", log_work::util::WorkDuration{ duration_of_day, duration: sum });
 }
