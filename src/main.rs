@@ -34,7 +34,33 @@ fn parse_duration(s: &str) -> Result<chrono::Duration, log_work::Error> {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(about="Read .work-files and give summaries of worked time.")]
+#[structopt(about=r"Read .work-files and give summaries of worked time.
+
+The format of the .work-files is:
+-- yyyy-mm-dd DD HH:MM -- Key1: description1
+-- yyyy-mm-dd DD HH:MM -- Key2: description2
+
+Some other text separated by the entries by an empty line.
+
+The format of the holidays-file is:
+yyyy-mm-dd -- [WKFUHÜ] description or
+yyyy-mm-dd--yyyy-mm-dd -- [WKFUHÜ] description
+
+lines that don't match any of the initial date-patterns are ignored.
+The meaning of the keys is:
+W - (Weiterbildung) Job Education/Job Travel. These days have an expected
+    logged time of 0, so you should not use it, if you plan on logging your
+    time for that job travel.
+K - (Krank) Sick. Expected logged time is 0.
+F - (Feiertag) Holiday. Expected logged time is 0.
+U - (Urlaub) Vacation. Expected logged time is 0. This will be added to the
+    vacation count.
+H - (Halber Tag Urlaub) Half day vacation. Expected logged time is 1/2 of a
+    day.
+Ü - (Überstundenabbau) Reduction of overtime. Expected logged time is 1 day.
+    This is just a marker, such that no warning regarding a missing day is
+    generated.
+")]
 #[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
 struct Opt {
     /// A file containing holidays and vacations
