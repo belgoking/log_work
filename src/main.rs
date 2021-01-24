@@ -259,7 +259,7 @@ fn main() {
             let jira_config =
                 log_work::jira::JiraConfig{
                     base_url: opt.jira_base_url.expect("Missing JIRA base URL"),
-                    username: opt.jira_username.clone(),
+                    username: opt.jira_username.expect("Missing JIRA username"),
                     password: opt.jira_password.clone(),
                 };
 

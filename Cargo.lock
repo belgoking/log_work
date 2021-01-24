@@ -904,6 +904,9 @@ name = "serde"
 version = "1.0.121"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6159e3c76cab06f6bc466244d43b35e77e9500cd685da87620addadc2a4c40b1"
+dependencies = [
+ "serde_derive",
+]
 
 [[package]]
 name = "serde_derive"
