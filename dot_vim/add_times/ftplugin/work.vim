@@ -40,6 +40,6 @@ nmap <buffer> <F4> :call <SID>InsertTimestamp()<CR>aPause<CR><Esc>
 imap <buffer> <F4> <Esc>:call <SID>InsertTimestamp()<CR>aPause<CR>
 
 " Execute the script that displays the work summary
-" You will need to have the "add_times" script in your "PATH" environment variable
+" You will need to have the "log_work" script in your "PATH" environment variable
 nmap <buffer> <F5> :w<CR>:! log_work -v -l %<CR>
 imap <buffer> <F5> <Esc>:w<CR>:! log_work -v -l %<CR>
