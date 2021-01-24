@@ -1,7 +1,7 @@
 extern crate chrono;
 #[macro_use] extern crate lazy_static;
 extern crate regex;
-#[macro_use] extern crate structopt;
+extern crate structopt;
 extern crate app_dirs;
 
 mod log_work;

@@ -123,9 +123,9 @@ pub fn consolidate_required_time(raw_entries: &Vec<DayTypeEntry>,
 {
     let mut map: std::collections::BTreeMap<Date, DayTypeEntry> = std::collections::BTreeMap::new();
     for ref raw_entry in raw_entries {
-        let mut old_entry = map.entry(raw_entry.date.clone());
+        let old_entry = map.entry(raw_entry.date.clone());
         match old_entry {
-            std::collections::btree_map::Entry::Vacant(mut vacant_entry) => {
+            std::collections::btree_map::Entry::Vacant(vacant_entry) => {
                 vacant_entry.insert((*raw_entry).clone());
             },
             std::collections::btree_map::Entry::Occupied(mut occupied_entry) => {
@@ -240,7 +240,7 @@ fn day_type_from_str(s: &str, file_name: &str, line_nr: u32) -> Result<DayType> 
     }
 }
 
-pub fn parse_required_time(stream: &mut std::io::BufRead, file_name: &str) -> Result<Vec<DayTypeEntry>>
+pub fn parse_required_time(stream: &mut dyn std::io::BufRead, file_name: &str) -> Result<Vec<DayTypeEntry>>
 {
     lazy_static!{
           static ref RE: regex::Regex =

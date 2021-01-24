@@ -74,7 +74,7 @@ pub struct WorkDay {
 
 impl WorkDay {
 
-    fn read_line(stream: &mut std::io::BufRead) -> Result<(bool, String)>
+    fn read_line(stream: &mut dyn std::io::BufRead) -> Result<(bool, String)>
     {
         let mut line = String::new();
         let num_bytes = stream.read_line(&mut line)?;
@@ -96,7 +96,7 @@ impl WorkDay {
 
     fn parse_description(description: &str) -> (String, Vec<String>)
     {
-        let description = description.trim_left();
+        let description = description.trim_start();
         if description.is_empty() {
             return (String::new(), Vec::new());
         }
@@ -115,7 +115,7 @@ impl WorkDay {
         Ok(EntryRaw{start_ts, key, sub_keys, raw_data: raw_data.to_string()})
     }
 
-    pub fn parse(stream: &mut std::io::BufRead, expected_date: Option<Date>, be_lenient: bool, file: &str) -> Result<WorkDay>
+    pub fn parse(stream: &mut dyn std::io::BufRead, expected_date: Option<Date>, be_lenient: bool, file: &str) -> Result<WorkDay>
     {
         let mut line_nr = 0u32;
         let date: Option<Date>;
@@ -178,7 +178,7 @@ impl WorkDay {
     }
 
     fn parse_entries(
-        line: String, stream: &mut std::io::BufRead,
+        line: String, stream: &mut dyn std::io::BufRead,
         expected_date: &Option<Date>, file: &str, line_nr: &mut u32)
         -> Result<Vec<EntryRaw>>
     {

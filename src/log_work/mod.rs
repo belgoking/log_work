@@ -30,7 +30,6 @@ pub enum Error {
 
 impl PartialEq for Error {
     fn eq(&self, other: &Error) -> bool {
-        use self::Error;
         match (self, other) {
             (&Error::CommandLineError(ref s), &Error::CommandLineError(ref o)) => s==o,
             (&Error::IOError(_), &Error::IOError(_)) => true,
