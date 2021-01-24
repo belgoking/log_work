@@ -1,8 +1,13 @@
+extern crate app_dirs;
 extern crate chrono;
+//extern crate hyper;
 #[macro_use] extern crate lazy_static;
 extern crate regex;
+extern crate reqwest;
+#[macro_use] extern crate serde_derive;
+extern crate serde;
+extern crate serde_json;
 extern crate structopt;
-extern crate app_dirs;
 
 mod log_work;
 
@@ -79,28 +84,70 @@ struct Opt {
     #[structopt(short="l", long="lenient")]
     be_lenient: bool,
 
+    /// Log the times of the days to the configured JIRA server
+    #[structopt(long="log_to_jira")]
+    log_to_jira: bool,
+
     /// The duration of a work-day matching the expressoin '(\d+h)? ?(\d+m)?' with the first part
     /// denominating the hours and the second part the minutes.
     #[structopt(short="u", long="duration_of_day", parse(try_from_str="parse_duration"))]
     duration_of_day: Option<chrono::Duration>,
+
+    /// The base URL of the JIRA server (e.g. 'https://jira.example.com/jira')
+    #[structopt(long="jira_base_url")]
+    jira_base_url: Option<String>,
+
+    /// The username of the JIRA user
+    #[structopt(long="jira_username")]
+    jira_username: Option<String>,
+
+    /// The password of the JIRA user
+    #[structopt(long="jira_password")]
+    jira_password: Option<String>,
 
     /// The .work-files
     #[structopt(parse(from_os_str))]
     files: Vec<std::path::PathBuf>,
 }
 
+impl Opt {
+    fn new() -> Opt {
+        Opt{
+            holidays: None,
+            debug: false,
+            verbose: false,
+            be_lenient: false,
+            log_to_jira: false,
+            duration_of_day: None,
+            jira_base_url: None,
+            jira_username: None,
+            jira_password: None,
+            files: Vec::new()}
+    }
+}
+
+fn first_available<T>(opt1: Option<T>, opt2: Option<T>) -> Option<T> {
+    match opt1 {
+        Some(v) => Some(v),
+        None => opt2,
+    }
+}
+
 fn main() {
-    let mut opt_from_file = if let Ok(mut rc_file) = app_dirs::get_app_root(app_dirs::AppDataType::UserConfig, &APP_INFO) {
+    let mut opt_from_file =
+        if let Ok(mut rc_file) = app_dirs::get_app_root(app_dirs::AppDataType::UserConfig, &APP_INFO)
+        {
             rc_file.push("log_work.rc");
+            println!("Application directory: {:?}", rc_file);
             if let Ok(f) = std::fs::File::open(rc_file) {
                 let mut lines: Vec<String> = std::io::BufReader::new(f).lines().map(|e| e.unwrap()).collect();
                 lines.insert(0, "DUMMY".to_string()); // normally the first element holds the program name
                 Opt::from_iter(lines.iter())
             } else {
-                Opt{holidays: None, debug: false, verbose: false, be_lenient: false, duration_of_day: None, files: Vec::new()}
+                Opt::new()
             }
         } else {
-            Opt{holidays: None, debug: false, verbose: false, be_lenient: false, duration_of_day: None, files: Vec::new()}
+            Opt::new()
         };
     let opt_from_args = Opt::from_args();
 
@@ -110,11 +157,15 @@ fn main() {
     let mut files = opt_from_args.files;
     files.append(&mut opt_from_file.files);
     let opt = Opt{
-            holidays: if let Some(h) = opt_from_args.holidays { Some(h) } else { opt_from_file.holidays },
+            holidays: first_available(opt_from_args.holidays, opt_from_file.holidays),
             debug: opt_from_args.debug || opt_from_file.debug,
             verbose: opt_from_args.verbose || opt_from_file.verbose,
             be_lenient: opt_from_args.be_lenient || opt_from_file.be_lenient,
-            duration_of_day: if let Some(d) = opt_from_args.duration_of_day { Some(d) } else { opt_from_file.duration_of_day },
+            log_to_jira: opt_from_args.log_to_jira, // here we actually ignore the options from the file
+            duration_of_day: first_available(opt_from_args.duration_of_day, opt_from_file.duration_of_day),
+            jira_base_url: first_available(opt_from_args.jira_base_url, opt_from_file.jira_base_url),
+            jira_username: first_available(opt_from_args.jira_username, opt_from_file.jira_username),
+            jira_password: first_available(opt_from_args.jira_password, opt_from_file.jira_password),
             files: files
         };
 
@@ -200,5 +251,30 @@ fn main() {
             }
         }
         println!("{:20}: {}", " == Total ==", log_work::util::WorkDuration{ duration_of_day, duration: sum });
+    }
+    if opt.log_to_jira {
+        if opt.be_lenient {
+            println!("ERROR: Updating JIRA-logging is forbidden in lenient mode!");
+        } else {
+            let jira_base_url = opt.jira_base_url.as_deref().expect("Missing JIRA base URL");
+
+            for ref day in &days.days {
+                let result =
+                    log_work::jira::update_logging_for_day(
+                        &day.work_day,
+                        jira_base_url,
+                        opt.jira_username.as_deref(),
+                        opt.jira_password.as_deref()
+                        );
+                match result {
+                    Ok(()) => {
+                        println!("Successfully updated JIRA time logging");
+                    },
+                    Err(e) => {
+                        println!("Sending the data to JIRA yielded the following result: {:?}", e);
+                    }
+                }
+            }
+        }
     }
 }

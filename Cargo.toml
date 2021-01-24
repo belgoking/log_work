@@ -10,3 +10,14 @@ lazy_static = "1.4.0"
 chrono = { version = "0.4", features = ["serde"] }
 structopt = "0.2"
 app_dirs = "1.2"
+
+# access to JIRA-API for logging
+
+#hyper = { version = "0.14", features = ["full"] }
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+
+serde = "1"
+serde_derive = "1"
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+

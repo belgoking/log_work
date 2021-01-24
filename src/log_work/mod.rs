@@ -1,3 +1,4 @@
+pub mod jira;
 pub mod required_time;
 pub mod work_day;
 pub mod util;
