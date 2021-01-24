@@ -20,6 +20,12 @@ impl From<reqwest::Error> for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+pub struct JiraConfig {
+    pub base_url: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug)]
 struct Response {
     issues: Vec<Issue>,
@@ -40,19 +46,17 @@ struct Issue {
 
 async fn retrieve_keys(
     day: Date,
-    jira_base_url: &str,
-    username: Option<&str>,
-    password: Option<&str>)
+    jira_config: &JiraConfig)
 -> Result<Vec<String>>
 {
     let uri = format!("{}{}/search?jql=worklogAuthor%3DcurrentUser()+AND+worklogDate%3D{}",
-                      jira_base_url, "/rest/api/2", day.format("%Y-%m-%d")); //"2021-01-13");
+                      jira_config.base_url, "/rest/api/2", day.format("%Y-%m-%d")); //"2021-01-13");
     println!("Querying: {}", uri);
     let mut builder = reqwest::Client::new()
         .get(&uri);
-    if let Some(username) = username {
+    if let Some(ref username) = &jira_config.username {
         builder =
-            builder.basic_auth(username, password);
+            builder.basic_auth(username, jira_config.password.as_ref());
     }
     builder
         .send().await?
@@ -63,10 +67,10 @@ async fn retrieve_keys(
 
 async fn set_logging_for_complete_day(
     day: &work_day::WorkDay,
-    jira_base_url: &str, username: Option<&str>, password: Option<&str>)
+    jira_config: &JiraConfig)
     -> Result<()>
 {
-    let issues = retrieve_keys(day.date, jira_base_url, username, password).await?;
+    let issues = retrieve_keys(day.date, jira_config).await?;
     println!("Issues: {:?}", issues);
     Ok(())
 }
@@ -74,11 +78,9 @@ async fn set_logging_for_complete_day(
 
 pub fn update_logging_for_day(
     day: &work_day::WorkDay,
-    jira_base_url: &str, username: Option<&str>, password: Option<&str>)
+    jira_config: &JiraConfig)
     -> Result<()>
 {
     let runtime = tokio::runtime::Runtime::new().expect("Failed to instantiate tokio runtime");
-    runtime.block_on(set_logging_for_complete_day(
-            day,
-            jira_base_url, username, password))
+    runtime.block_on(set_logging_for_complete_day(day, jira_config))
 }

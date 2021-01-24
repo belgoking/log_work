@@ -256,15 +256,18 @@ fn main() {
         if opt.be_lenient {
             println!("ERROR: Updating JIRA-logging is forbidden in lenient mode!");
         } else {
-            let jira_base_url = opt.jira_base_url.as_deref().expect("Missing JIRA base URL");
+            let jira_config =
+                log_work::jira::JiraConfig{
+                    base_url: opt.jira_base_url.expect("Missing JIRA base URL"),
+                    username: opt.jira_username.clone(),
+                    password: opt.jira_password.clone(),
+                };
 
             for ref day in &days.days {
                 let result =
                     log_work::jira::update_logging_for_day(
                         &day.work_day,
-                        jira_base_url,
-                        opt.jira_username.as_deref(),
-                        opt.jira_password.as_deref()
+                        &jira_config
                         );
                 match result {
                     Ok(()) => {
