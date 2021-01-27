@@ -1,5 +1,6 @@
 extern crate app_dirs;
 extern crate chrono;
+extern crate itertools;
 //extern crate hyper;
 #[macro_use] extern crate lazy_static;
 extern crate regex;
@@ -263,19 +264,17 @@ fn main() {
                     password: opt.jira_password.clone(),
                 };
 
-            for ref day in &days.days {
-                let result =
-                    log_work::jira::update_logging_for_day(
-                        &day.work_day,
-                        &jira_config
-                        );
-                match result {
-                    Ok(()) => {
-                        println!("Successfully updated JIRA time logging");
-                    },
-                    Err(e) => {
-                        println!("Sending the data to JIRA yielded the following result: {:?}", e);
-                    }
+            let result =
+                log_work::jira::update_logging_for_days(
+                    &days.days.iter().map(|day| &day.work_day).collect(),
+                    &jira_config
+                    );
+            match result {
+                Ok(()) => {
+                    println!("Successfully updated JIRA time logging");
+                },
+                Err(e) => {
+                    println!("Sending the data to JIRA yielded the following result: {:?}", e);
                 }
             }
         }

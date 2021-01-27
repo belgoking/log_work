@@ -10,6 +10,7 @@ lazy_static = "1.4.0"
 chrono = { version = "0.4", features = ["serde"] }
 structopt = "0.2"
 app_dirs = "1.2"
+itertools = "0.10"
 
 # access to JIRA-API for logging
 

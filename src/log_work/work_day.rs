@@ -100,8 +100,8 @@ impl WorkDay {
         if description.is_empty() {
             return (String::new(), Vec::new());
         }
-        let mut iter = description.split(|c| c == ' ' || c == ':');
-        (iter.next().unwrap().to_string(), Vec::new())
+        let mut iter = description.split(|c| c == ' ' || c == ':').filter(|x| !x.is_empty());
+        (iter.next().unwrap_or("").to_string(), iter.map(|x| x.to_owned()).collect())
     }
 
     fn parse_entry(year: &str, month: &str, day: &str, hour: &str, minute: &str, desc: &str, raw_data: &str) -> Result<EntryRaw>
