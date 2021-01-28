@@ -70,9 +70,39 @@ struct WorklogAuthor {
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 struct NewWorklogEntry {
     comment: String,
+    #[serde(with = "my_date_format")]
     started: DateTime,
     #[serde(rename = "timeSpentSeconds")]
     time_spent_seconds: u64,
+}
+
+mod my_date_format {
+    use super::*;
+    use serde::Deserialize as _;
+    use chrono::TimeZone as _;
+
+    const FORMAT: &'static str = "%Y-%m-%dT%H:%M:%S%.3f%z";
+
+    pub fn serialize<S>(
+        date: &DateTime,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let s = format!("{}", date.format(FORMAT));
+        serializer.serialize_str(&s)
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> std::result::Result<DateTime, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        chrono::Local.datetime_from_str(&s, FORMAT).map_err(serde::de::Error::custom)
+    }
 }
 
 async fn retrieve_json<T: for<'de> serde::Deserialize<'de>>(
@@ -84,7 +114,8 @@ async fn retrieve_json<T: for<'de> serde::Deserialize<'de>>(
     let response = client
         .get(&format!("{}{}", jira_config.base_url, query_path))
         .basic_auth(&jira_config.username, jira_config.password.as_ref())
-        .send().await?;
+        .send()
+        .await?;
     if !response.status().is_success() {
         return Err(Error::HttpErrorStatusCode(response.status()));
     }
@@ -112,7 +143,7 @@ async fn post_worklog(
     Ok(())
 }
 
-async fn retrieve_keys(
+async fn retrieve_issues_with_worklogs(
     day: &Date,
     client: &reqwest::Client,
     jira_config: &JiraConfig)
@@ -150,11 +181,11 @@ async fn do_update_logging_for_days(
     let client = reqwest::Client::new();
 
     let mut issues_with_old_logs = std::collections::BTreeSet::new();
+    println!("Retrieving issues with logs on one of the {} day(s)", days.len());
     for ref day in days {
-        let mut issues = retrieve_keys(&day.date,
-                                       &client,
-                                       jira_config).await?;
-        println!("Issues: {:?}", issues);
+        let mut issues = retrieve_issues_with_worklogs(&day.date,
+                                                       &client,
+                                                       jira_config).await?;
         issues_with_old_logs.extend(issues.drain(..));
     }
 
@@ -176,17 +207,19 @@ async fn do_update_logging_for_days(
         }
         my_logs
     };
+    println!("Found {} old log entries of user {}", my_logs.len(), jira_config.username);
 
     // println!("Would delete: {:?}", my_logs.iter().map(|ref log| format!("{}_{}", log.issue_id, log.id)).collect::<std::vec::Vec<_>>());
     for ref worklog in my_logs {
-        println!("Do you really want do delete worklog entry for issue={} start_time='{}' duration={}(secs)? (yN): ",
+        println!("Do you want to delete old worklog entry for issue={} start_time='{}' duration={}(secs)? (yN): ",
                  worklog.issue_id, worklog.started, worklog.time_spent_seconds);
         // this blocks on purpose (see documentation of tokio::io::stdin())
         let mut buf = String::new();
         std::io::stdin().read_line(&mut buf)?;
         if buf.as_str() == "y\n" {
             // TODO: delete the entry
-            let uri = format!("/rest/api/2/issue/{}/worklog/{}", worklog.issue_id, worklog.id);
+            let uri = format!("{}/rest/api/2/issue/{}/worklog/{}",
+                              jira_config.base_url, worklog.issue_id, worklog.id);
             let response = client
                 .delete(uri.as_str())
                 .basic_auth(&jira_config.username, jira_config.password.as_ref())
@@ -216,10 +249,18 @@ async fn do_update_logging_for_days(
     // check whether the given issue names exist
     let mut unknown_issues = std::collections::BTreeSet::new();
     for issue in possible_issue_names {
-        if is_jira_issue(issue, &client, jira_config).await? {
-            confirmed_issues.insert(issue);
-        } else {
-            unknown_issues.insert(issue);
+        match is_jira_issue(issue, &client, jira_config).await {
+            Err(e) => {
+                println!("Error while verifying issue='{}': {:?}", issue, e);
+                unknown_issues.insert(issue);
+            },
+            Ok(success) => {
+                if success {
+                    confirmed_issues.insert(issue);
+                } else {
+                    unknown_issues.insert(issue);
+                }
+            },
         }
     }
     println!("Confirmed issues: {:?}", confirmed_issues);
