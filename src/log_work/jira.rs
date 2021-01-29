@@ -173,6 +173,14 @@ async fn is_jira_issue(issue: &str,
     Ok(true)
 }
 
+fn has_jira_key_structure(candidate: &str) -> bool {
+    lazy_static!{
+        static ref RE: regex::Regex = regex::Regex::new(r"^[^- ]+-[0-9]+$")
+            .expect("Erronuous expression for JIRA issue key");
+    }
+    RE.is_match(candidate)
+}
+
 async fn do_update_logging_for_days(
     days: &std::vec::Vec<&work_day::WorkDay>,
     jira_config: &JiraConfig)
@@ -237,7 +245,7 @@ async fn do_update_logging_for_days(
         .iter()
         .flat_map(|day| day.entries.iter())
         .map(|entry| &entry.key)
-        .filter(|issue_name| &issue_name[..] != "Pause")
+        .filter(|issue_name| has_jira_key_structure(issue_name.as_str()))
         .map(|issue_name| issue_name)
         .collect();
 
@@ -263,8 +271,6 @@ async fn do_update_logging_for_days(
             },
         }
     }
-    println!("Confirmed issues: {:?}", confirmed_issues);
-    println!("Unkown issues: {:?}", unknown_issues);
 
     // perform the worklogs
     let mut transmitted = std::vec::Vec::new();
@@ -272,7 +278,8 @@ async fn do_update_logging_for_days(
     let mut with_transmission_error = std::vec::Vec::new();
     for day in days {
         for entry in &day.entries {
-            if confirmed_issues.contains(&entry.key) {
+            if confirmed_issues.contains(&entry.key)
+               && !entry.duration.is_zero() {
                 let new_worklog = NewWorklogEntry{
                     comment: itertools::join(&entry.sub_keys, " "),
                     started: day.date.and_time(entry.start_ts)
@@ -290,8 +297,9 @@ async fn do_update_logging_for_days(
                 without_issue.push(entry.clone());
             }
         }
-
     }
+    println!("Added {} worklog entries, ignored {} because of they were not correct, and {} transmission errors",
+             transmitted.len(), without_issue.len(), with_transmission_error.len());
 
     Ok(())
 }
