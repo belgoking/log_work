@@ -242,16 +242,18 @@ fn main() {
         sum_required = sum_required + day.required_time.required_time;
     }
     if days.days.len() > 1 {
-        println!("= Summary for all days: Required: {}",
-                 log_work::util::WorkDuration{duration: sum_required, duration_of_day});
+        println!("= Summary for all days:");
         let mut sum = chrono::Duration::hours(0);
         for (key, duration) in summary.iter() {
-            println!("{:20}: {}", key, log_work::util::WorkDuration{ duration_of_day, duration: *duration });
+            println!("{:20}:{:>20}", key, log_work::util::WorkDuration{ duration_of_day, duration: *duration });
             if key != "Pause" {
                 sum = sum + *duration;
             }
         }
-        println!("{:20}: {}", " == Total ==", log_work::util::WorkDuration{ duration_of_day, duration: sum });
+        println!("{:20}: {:>20}", " == Required ==",
+                 log_work::util::WorkDuration{duration: sum_required, duration_of_day});
+        println!("{:20}: {:>20}", " == Total ==",
+                 log_work::util::WorkDuration{ duration_of_day, duration: sum });
     }
     if opt.log_to_jira {
         if opt.be_lenient {

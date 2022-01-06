@@ -307,7 +307,7 @@ impl<'a> std::fmt::Display for DaySummary<'a> {
         let duration_of_day = self.day.duration_of_day;
         if self.verbose {
             for entry in &self.day.work_day.entries {
-                write!(f, "{} {} {}",
+                write!(f, "{} {:>15} {}",
                        &entry.raw_data[0..25],
                        util::WorkDuration{ duration_of_day, duration: entry.duration },
                        &entry.raw_data[25..])?;
@@ -316,12 +316,13 @@ impl<'a> std::fmt::Display for DaySummary<'a> {
         write!(f, "= {}\n", self.day.required_time)?;
         let mut sum = chrono::Duration::hours(0);
         for (key, duration) in self.day.work_day.compute_summary().iter() {
-            write!(f, "{:20}: {}\n", key, util::WorkDuration{ duration_of_day, duration: *duration })?;
+            write!(f, "{:20}: {:>19}\n", key, util::WorkDuration{ duration_of_day, duration: *duration })?;
             if key != "Pause" {
                 sum = sum + *duration;
             }
         }
-        write!(f, "{:20}: {}\n", " == Total ==", util::WorkDuration{ duration_of_day, duration: sum })?;
+        write!(f, "{:20}: {:>19}\n", " == Required ==", util::WorkDuration{ duration_of_day, duration: self.day.required_time.required_time })?;
+        write!(f, "{:20}: {:>19}\n", " == Total ==", util::WorkDuration{ duration_of_day, duration: sum })?;
         return Ok(());
     }
 }

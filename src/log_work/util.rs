@@ -31,19 +31,29 @@ pub struct WorkDuration {
 
 impl std::fmt::Display for WorkDuration {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+
         let mut remaining_minutes = self.duration.num_minutes();
         let days = remaining_minutes / self.duration_of_day.num_minutes();
-        if days > 0 { write!(f, "{:3}d", days)?; }
-        else { write!(f, "    ")?; }
         remaining_minutes %= self.duration_of_day.num_minutes();
         let hours = remaining_minutes / 60;
-        if hours > 0 { write!(f, " {:2}h", hours)?; }
-        else { write!(f, "    ")?; }
         remaining_minutes %= 60;
         let minutes = remaining_minutes;
-        if minutes > 0 { write!(f, " {:2}m", minutes)? }
-        else { write!(f, "    ")? }
-        return write!(f, " ({:>5.2}h)", (self.duration.num_minutes() as f64) / 60.);
+
+        let total_minutes = (self.duration.num_minutes() as f64) / 60.;
+
+        let txt = if days > 0 {
+                format!("{}d {}h {:2}m ({:>5.2}h)",
+                        days, hours, minutes,
+                        total_minutes)
+            } else if hours > 0 {
+                format!("{}h {:2}m ({:>5.2}h)",
+                        hours, minutes, total_minutes)
+            } else {
+                format!("{:2}m ({:>5.2}h)",
+                        minutes, total_minutes)
+            };
+
+        f.pad(txt.as_str())
     }
 }
 

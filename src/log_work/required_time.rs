@@ -108,10 +108,9 @@ pub struct RequiredTime {
 impl std::fmt::Display for RequiredTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         return
-            write!(f, "Day: {} Type: {} Required: {}",
+            write!(f, "Day: {} Type: {}",
                    self.date.format("%F (%a)"),
-                   self.day_type,
-                   util::HourMinuteDuration{duration: &self.required_time} );
+                   self.day_type );
     }
 }
 
