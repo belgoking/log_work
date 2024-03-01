@@ -44,7 +44,7 @@ fn parse_duration(s: &str) -> Result<chrono::Duration, log_work::Error> {
     }
 }
 
-#[derive(Debug, structopt::StructOpt)]
+#[derive(Debug, structopt::StructOpt, Default)]
 #[structopt(about = r"Read .work-files and give summaries of worked time.
 
 The format of the .work-files is:
@@ -120,23 +120,6 @@ struct Opt {
     files: Vec<std::path::PathBuf>,
 }
 
-impl Opt {
-    fn new() -> Opt {
-        Opt {
-            holidays: None,
-            debug: false,
-            verbose: false,
-            be_lenient: false,
-            log_to_jira: false,
-            duration_of_day: None,
-            jira_base_url: None,
-            jira_username: None,
-            jira_password: None,
-            files: Vec::new(),
-        }
-    }
-}
-
 fn first_available<T>(opt1: Option<T>, opt2: Option<T>) -> Option<T> {
     match opt1 {
         Some(v) => Some(v),
@@ -157,7 +140,7 @@ fn main() {
             lines.insert(0, "DUMMY".to_string()); // normally the first element holds the program name
             Opt::from_iter(lines.iter())
         } else {
-            Opt::new()
+            Opt::default()
         }
     };
     let opt_from_args = Opt::from_args();
