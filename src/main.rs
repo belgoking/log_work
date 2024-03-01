@@ -1,4 +1,3 @@
-extern crate app_dirs;
 extern crate chrono;
 extern crate itertools;
 //extern crate hyper;
@@ -18,10 +17,10 @@ use structopt::StructOpt;
 
 use std::io::BufRead;
 
-const APP_INFO: app_dirs::AppInfo = app_dirs::AppInfo {
-    name: "log_work",
-    author: "Tobias Kölsch",
-};
+lazy_static::lazy_static! {
+static ref APP_INFO: directories::ProjectDirs =
+    directories::ProjectDirs::from("de", "belgoking", "log_work").unwrap();
+}
 
 /** TODO
  * Unittests for aggregating functions
@@ -146,9 +145,8 @@ fn first_available<T>(opt1: Option<T>, opt2: Option<T>) -> Option<T> {
 }
 
 fn main() {
-    let mut opt_from_file = if let Ok(mut rc_file) =
-        app_dirs::get_app_root(app_dirs::AppDataType::UserConfig, &APP_INFO)
-    {
+    let mut opt_from_file = {
+        let mut rc_file = APP_INFO.config_dir().to_path_buf();
         rc_file.push("log_work.rc");
         println!("Application directory: {:?}", rc_file);
         if let Ok(f) = std::fs::File::open(rc_file) {
@@ -161,8 +159,6 @@ fn main() {
         } else {
             Opt::new()
         }
-    } else {
-        Opt::new()
     };
     let opt_from_args = Opt::from_args();
 
