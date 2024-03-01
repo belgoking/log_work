@@ -1,7 +1,7 @@
 pub mod jira;
 pub mod required_time;
-pub mod work_day;
 pub mod util;
+pub mod work_day;
 
 extern crate chrono;
 //use chrono::TimeZone;
@@ -17,51 +17,116 @@ pub enum Error {
     CommandLineError(String),
     IOError(std::io::Error),
     ParseIntError(std::num::ParseIntError),
-    InvalidFileNameError{file: std::path::PathBuf},
-    ParseDayTypeError{file: String, line_nr: u32},
-    TimeNotMonotonicError{file: String, line_nr: u32},
-    DuplicateDateError{file: String, line_nr: u32},
-    EntryAfterSeparatorError{file: String, line_nr: u32},
-    MissingDateError{file: String},
-    MissingFinalPauseError{file: String},
-    UnexpectedDateError{file: String, line_nr: u32,
+    InvalidFileNameError {
+        file: std::path::PathBuf,
+    },
+    ParseDayTypeError {
+        file: String,
+        line_nr: u32,
+    },
+    TimeNotMonotonicError {
+        file: String,
+        line_nr: u32,
+    },
+    DuplicateDateError {
+        file: String,
+        line_nr: u32,
+    },
+    EntryAfterSeparatorError {
+        file: String,
+        line_nr: u32,
+    },
+    MissingDateError {
+        file: String,
+    },
+    MissingFinalPauseError {
+        file: String,
+    },
+    UnexpectedDateError {
+        file: String,
+        line_nr: u32,
         expected_date: Date,
-        found_date: Date},
+        found_date: Date,
+    },
 }
 
 impl PartialEq for Error {
     fn eq(&self, other: &Error) -> bool {
         match (self, other) {
-            (&Error::CommandLineError(ref s), &Error::CommandLineError(ref o)) => s==o,
+            (&Error::CommandLineError(ref s), &Error::CommandLineError(ref o)) => s == o,
             (&Error::IOError(_), &Error::IOError(_)) => true,
             (&Error::ParseIntError(_), &Error::ParseIntError(_)) => true,
-            (&Error::InvalidFileNameError{file: ref s_file},
-             &Error::InvalidFileNameError{file: ref o_file}) =>
-                 (s_file==o_file),
-            (&Error::ParseDayTypeError{file: ref s_file, line_nr: s_line_nr},
-             &Error::ParseDayTypeError{file: ref o_file, line_nr: o_line_nr}) =>
-                 (s_file==o_file && s_line_nr==o_line_nr),
-            (&Error::TimeNotMonotonicError{file: ref s_file, line_nr: s_line_nr},
-             &Error::TimeNotMonotonicError{file: ref o_file, line_nr: o_line_nr}) =>
-                 (s_file==o_file && s_line_nr==o_line_nr),
-            (&Error::DuplicateDateError{file: ref s_file, line_nr: s_line_nr},
-             &Error::DuplicateDateError{file: ref o_file, line_nr: o_line_nr}) =>
-                 (s_file==o_file && s_line_nr==o_line_nr),
-            (&Error::EntryAfterSeparatorError{file: ref s_file, line_nr: s_line_nr},
-             &Error::EntryAfterSeparatorError{file: ref o_file, line_nr: o_line_nr}) =>
-                 (s_file==o_file && s_line_nr==o_line_nr),
-            (&Error::MissingDateError{file: ref s_file},
-             &Error::MissingDateError{file: ref o_file}) => (s_file==o_file),
-            (&Error::MissingFinalPauseError{file: ref s_file},
-             &Error::MissingFinalPauseError{file: ref o_file}) => (s_file==o_file),
-            (&Error::UnexpectedDateError{file: ref s_file, line_nr: s_line_nr,
-                                         expected_date: ref s_expected_date,
-                                         found_date: ref s_found_date},
-             &Error::UnexpectedDateError{file: ref o_file, line_nr: o_line_nr,
-                                         expected_date: ref o_expected_date,
-                                         found_date: ref o_found_date}) =>
-                (s_file==o_file && s_line_nr==o_line_nr &&
-                 s_expected_date==o_expected_date && s_found_date==o_found_date),
+            (
+                &Error::InvalidFileNameError { file: ref s_file },
+                &Error::InvalidFileNameError { file: ref o_file },
+            ) => (s_file == o_file),
+            (
+                &Error::ParseDayTypeError {
+                    file: ref s_file,
+                    line_nr: s_line_nr,
+                },
+                &Error::ParseDayTypeError {
+                    file: ref o_file,
+                    line_nr: o_line_nr,
+                },
+            ) => (s_file == o_file && s_line_nr == o_line_nr),
+            (
+                &Error::TimeNotMonotonicError {
+                    file: ref s_file,
+                    line_nr: s_line_nr,
+                },
+                &Error::TimeNotMonotonicError {
+                    file: ref o_file,
+                    line_nr: o_line_nr,
+                },
+            ) => (s_file == o_file && s_line_nr == o_line_nr),
+            (
+                &Error::DuplicateDateError {
+                    file: ref s_file,
+                    line_nr: s_line_nr,
+                },
+                &Error::DuplicateDateError {
+                    file: ref o_file,
+                    line_nr: o_line_nr,
+                },
+            ) => (s_file == o_file && s_line_nr == o_line_nr),
+            (
+                &Error::EntryAfterSeparatorError {
+                    file: ref s_file,
+                    line_nr: s_line_nr,
+                },
+                &Error::EntryAfterSeparatorError {
+                    file: ref o_file,
+                    line_nr: o_line_nr,
+                },
+            ) => (s_file == o_file && s_line_nr == o_line_nr),
+            (
+                &Error::MissingDateError { file: ref s_file },
+                &Error::MissingDateError { file: ref o_file },
+            ) => (s_file == o_file),
+            (
+                &Error::MissingFinalPauseError { file: ref s_file },
+                &Error::MissingFinalPauseError { file: ref o_file },
+            ) => (s_file == o_file),
+            (
+                &Error::UnexpectedDateError {
+                    file: ref s_file,
+                    line_nr: s_line_nr,
+                    expected_date: ref s_expected_date,
+                    found_date: ref s_found_date,
+                },
+                &Error::UnexpectedDateError {
+                    file: ref o_file,
+                    line_nr: o_line_nr,
+                    expected_date: ref o_expected_date,
+                    found_date: ref o_found_date,
+                },
+            ) => {
+                (s_file == o_file
+                    && s_line_nr == o_line_nr
+                    && s_expected_date == o_expected_date
+                    && s_found_date == o_found_date)
+            }
             _ => return false,
         }
     }
@@ -73,38 +138,53 @@ impl std::fmt::Display for Error {
             Error::CommandLineError(ref s) => write!(f, "CommandLineError: {}", s),
             Error::IOError(ref err) => write!(f, "IOError: {}", err),
             Error::ParseIntError(ref err) => write!(f, "ParseIntError: {}", err),
-            Error::InvalidFileNameError{ref file} =>
-                write!(f, "InvalidFileNameError: {:?}", file),
-            Error::ParseDayTypeError{ref file, ref line_nr} =>
-                write!(f, "ParseDayTypeError: {}:{}", file, line_nr),
-            Error::TimeNotMonotonicError{ref file, ref line_nr} =>
-                write!(f, "TimeNotMonotonicError: {}:{}", file, line_nr),
-            Error::DuplicateDateError{ref file, ref line_nr} =>
-                write!(f, "DuplicateDateError: {}:{}", file, line_nr),
-            Error::EntryAfterSeparatorError{ref file, ref line_nr} =>
-                write!(f, "EntryAfterSeparatorError: {}:{}", file, line_nr),
-            Error::MissingDateError{ref file} =>
-                write!(f, "MissingDateError: {}", file),
-            Error::MissingFinalPauseError{ref file} =>
-                write!(f, "MissingFinalPauseError: {}", file),
-            Error::UnexpectedDateError{
-                ref file, ref line_nr,
-                ref expected_date, ref found_date} =>
-                    write!(f, "UnexpectedDateError: {}:{}: expected={} found={}",
-                           file, line_nr, expected_date, found_date),
+            Error::InvalidFileNameError { ref file } => {
+                write!(f, "InvalidFileNameError: {:?}", file)
+            }
+            Error::ParseDayTypeError {
+                ref file,
+                ref line_nr,
+            } => write!(f, "ParseDayTypeError: {}:{}", file, line_nr),
+            Error::TimeNotMonotonicError {
+                ref file,
+                ref line_nr,
+            } => write!(f, "TimeNotMonotonicError: {}:{}", file, line_nr),
+            Error::DuplicateDateError {
+                ref file,
+                ref line_nr,
+            } => write!(f, "DuplicateDateError: {}:{}", file, line_nr),
+            Error::EntryAfterSeparatorError {
+                ref file,
+                ref line_nr,
+            } => write!(f, "EntryAfterSeparatorError: {}:{}", file, line_nr),
+            Error::MissingDateError { ref file } => write!(f, "MissingDateError: {}", file),
+            Error::MissingFinalPauseError { ref file } => {
+                write!(f, "MissingFinalPauseError: {}", file)
+            }
+            Error::UnexpectedDateError {
+                ref file,
+                ref line_nr,
+                ref expected_date,
+                ref found_date,
+            } => write!(
+                f,
+                "UnexpectedDateError: {}:{}: expected={} found={}",
+                file, line_nr, expected_date, found_date
+            ),
         }
     }
 }
 
 impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Error { Error::IOError(err) }
+    fn from(err: std::io::Error) -> Error {
+        Error::IOError(err)
+    }
 }
 
 impl From<std::num::ParseIntError> for Error {
-    fn from(err: std::num::ParseIntError) -> Error { Error::ParseIntError(err) }
+    fn from(err: std::num::ParseIntError) -> Error {
+        Error::ParseIntError(err)
+    }
 }
 
-
 type Result<T> = std::result::Result<T, Error>;
-
-

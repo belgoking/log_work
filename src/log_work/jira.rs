@@ -11,19 +11,27 @@ pub enum Error {
 }
 
 impl From<serde_json::error::Error> for Error {
-    fn from(err: serde_json::error::Error) -> Error { Error::JsonParsingError(err) }
+    fn from(err: serde_json::error::Error) -> Error {
+        Error::JsonParsingError(err)
+    }
 }
 
 impl From<reqwest::Error> for Error {
-    fn from(err: reqwest::Error) -> Error { Error::NetworkError(err) }
+    fn from(err: reqwest::Error) -> Error {
+        Error::NetworkError(err)
+    }
 }
 
 impl From<core::num::TryFromIntError> for Error {
-    fn from(err: core::num::TryFromIntError) -> Error { Error::ConversionError(err) }
+    fn from(err: core::num::TryFromIntError) -> Error {
+        Error::ConversionError(err)
+    }
 }
 
 impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Error { Error::MiscError(format!("{:?}", err)) }
+    fn from(err: std::io::Error) -> Error {
+        Error::MiscError(format!("{:?}", err))
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -43,7 +51,6 @@ struct ResponseWithIssues {
 struct Issue {
     key: String,
 }
-
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 struct ResponseWithWorklogs {
@@ -78,15 +85,12 @@ struct NewWorklogEntry {
 
 mod my_date_format {
     use super::*;
-    use serde::Deserialize as _;
     use chrono::TimeZone as _;
+    use serde::Deserialize as _;
 
     const FORMAT: &'static str = "%Y-%m-%dT%H:%M:%S%.3f%z";
 
-    pub fn serialize<S>(
-        date: &DateTime,
-        serializer: S,
-    ) -> std::result::Result<S::Ok, S::Error>
+    pub fn serialize<S>(date: &DateTime, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -94,23 +98,22 @@ mod my_date_format {
         serializer.serialize_str(&s)
     }
 
-    pub fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> std::result::Result<DateTime, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> std::result::Result<DateTime, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        chrono::Local.datetime_from_str(&s, FORMAT).map_err(serde::de::Error::custom)
+        chrono::Local
+            .datetime_from_str(&s, FORMAT)
+            .map_err(serde::de::Error::custom)
     }
 }
 
 async fn retrieve_json<T: for<'de> serde::Deserialize<'de>>(
     query_path: &str,
     client: &reqwest::Client,
-    jira_config: &JiraConfig)
--> Result<T>
-{
+    jira_config: &JiraConfig,
+) -> Result<T> {
     let response = client
         .get(&format!("{}{}", jira_config.base_url, query_path))
         .basic_auth(&jira_config.username, jira_config.password.as_ref())
@@ -119,20 +122,21 @@ async fn retrieve_json<T: for<'de> serde::Deserialize<'de>>(
     if !response.status().is_success() {
         return Err(Error::HttpErrorStatusCode(response.status()));
     }
-    response.json::<T>().await
-            .map_err(|err| err.into())
+    response.json::<T>().await.map_err(|err| err.into())
 }
 
 async fn post_worklog(
     issue_name: &str,
     new_worklog: &NewWorklogEntry,
     client: &reqwest::Client,
-    jira_config: &JiraConfig)
--> Result<()>
-{
+    jira_config: &JiraConfig,
+) -> Result<()> {
     println!("POSTING ISSUE {} ({:?})", issue_name, new_worklog);
     let response = client
-        .post(&format!("{}/rest/api/2/issue/{}/worklog", jira_config.base_url, issue_name))
+        .post(&format!(
+            "{}/rest/api/2/issue/{}/worklog",
+            jira_config.base_url, issue_name
+        ))
         .basic_auth(&jira_config.username, jira_config.password.as_ref())
         .json(new_worklog)
         .send()
@@ -146,23 +150,27 @@ async fn post_worklog(
 async fn retrieve_issues_with_worklogs(
     day: &Date,
     client: &reqwest::Client,
-    jira_config: &JiraConfig)
--> Result<Vec<String>>
-{
+    jira_config: &JiraConfig,
+) -> Result<Vec<String>> {
     // TODO: add request filter such that not all fields of the Tickets are retrieved
-    let uri = format!("/rest/api/2/search?jql=worklogAuthor%3DcurrentUser()+AND+worklogDate%3D{}",
-                      day.format("%Y-%m-%d"));
+    let uri = format!(
+        "/rest/api/2/search?jql=worklogAuthor%3DcurrentUser()+AND+worklogDate%3D{}",
+        day.format("%Y-%m-%d")
+    );
     let issues = retrieve_json::<ResponseWithIssues>(&uri, &client, jira_config)
         .await?
-        .issues.drain(..).map(|issue| issue.key).collect();
+        .issues
+        .drain(..)
+        .map(|issue| issue.key)
+        .collect();
     Ok(issues)
 }
 
-async fn is_jira_issue(issue: &str,
-                       client: &reqwest::Client,
-                       jira_config: &JiraConfig)
-    -> Result<bool>
-{
+async fn is_jira_issue(
+    issue: &str,
+    client: &reqwest::Client,
+    jira_config: &JiraConfig,
+) -> Result<bool> {
     let uri = format!("/rest/api/2/issue/{}?fields=id", issue);
     if let Err(e) = retrieve_json::<Issue>(&uri, client, jira_config).await {
         match e {
@@ -174,48 +182,55 @@ async fn is_jira_issue(issue: &str,
 }
 
 fn has_jira_key_structure(candidate: &str) -> bool {
-    lazy_static!{
-        static ref RE: regex::Regex = regex::Regex::new(r"^[^- ]+-[0-9]+$")
-            .expect("Erronuous expression for JIRA issue key");
+    lazy_static! {
+        static ref RE: regex::Regex =
+            regex::Regex::new(r"^[^- ]+-[0-9]+$").expect("Erronuous expression for JIRA issue key");
     }
     RE.is_match(candidate)
 }
 
 async fn do_update_logging_for_days(
     days: &std::vec::Vec<&work_day::WorkDay>,
-    jira_config: &JiraConfig)
-    -> Result<()>
-{
+    jira_config: &JiraConfig,
+) -> Result<()> {
     let client = reqwest::Client::new();
 
     let mut issues_with_old_logs = std::collections::BTreeSet::new();
-    println!("Retrieving issues with logs on one of the {} day(s)", days.len());
+    println!(
+        "Retrieving issues with logs on one of the {} day(s)",
+        days.len()
+    );
     for ref day in days {
-        let mut issues = retrieve_issues_with_worklogs(&day.date,
-                                                       &client,
-                                                       jira_config).await?;
+        let mut issues = retrieve_issues_with_worklogs(&day.date, &client, jira_config).await?;
         issues_with_old_logs.extend(issues.drain(..));
     }
 
-    let relevant_days: std::collections::HashSet<_> = days.iter().map(|ref day| day.date.clone()).collect();
+    let relevant_days: std::collections::HashSet<_> =
+        days.iter().map(|ref day| day.date.clone()).collect();
 
     let my_logs = {
         let mut my_logs = std::vec::Vec::new();
         for ref issue in &issues_with_old_logs {
             let uri = format!("/rest/api/2/issue/{}/worklog", issue);
-            let mut worklogs = retrieve_json::<ResponseWithWorklogs>(&uri, &client, jira_config)
-                .await?;
+            let mut worklogs =
+                retrieve_json::<ResponseWithWorklogs>(&uri, &client, jira_config).await?;
             let mut worklogs: std::vec::Vec<_> = worklogs
                 .worklogs
                 .drain(..)
-                .filter(|entry| entry.author.name == jira_config.username
-                        && relevant_days.contains(&entry.started.date()))
+                .filter(|entry| {
+                    entry.author.name == jira_config.username
+                        && relevant_days.contains(&entry.started.date())
+                })
                 .collect();
             my_logs.append(&mut worklogs);
         }
         my_logs
     };
-    println!("Found {} old log entries of user {}", my_logs.len(), jira_config.username);
+    println!(
+        "Found {} old log entries of user {}",
+        my_logs.len(),
+        jira_config.username
+    );
 
     // println!("Would delete: {:?}", my_logs.iter().map(|ref log| format!("{}_{}", log.issue_id, log.id)).collect::<std::vec::Vec<_>>());
     for ref worklog in my_logs {
@@ -226,16 +241,22 @@ async fn do_update_logging_for_days(
         std::io::stdin().read_line(&mut buf)?;
         if buf.as_str() == "y\n" {
             // TODO: delete the entry
-            let uri = format!("{}/rest/api/2/issue/{}/worklog/{}",
-                              jira_config.base_url, worklog.issue_id, worklog.id);
+            let uri = format!(
+                "{}/rest/api/2/issue/{}/worklog/{}",
+                jira_config.base_url, worklog.issue_id, worklog.id
+            );
             let response = client
                 .delete(uri.as_str())
                 .basic_auth(&jira_config.username, jira_config.password.as_ref())
-                .send().await.map_err(|err| {println!("ERR: {:?}", err); err})?;
+                .send()
+                .await
+                .map_err(|err| {
+                    println!("ERR: {:?}", err);
+                    err
+                })?;
             if !response.status().is_success() {
                 return Err(Error::HttpErrorStatusCode(response.status()));
             }
-
         } else {
             println!("ignoring old entry");
         }
@@ -261,14 +282,14 @@ async fn do_update_logging_for_days(
             Err(e) => {
                 println!("Error while verifying issue='{}': {:?}", issue, e);
                 unknown_issues.insert(issue);
-            },
+            }
             Ok(success) => {
                 if success {
                     confirmed_issues.insert(issue);
                 } else {
                     unknown_issues.insert(issue);
                 }
-            },
+            }
         }
     }
 
@@ -278,11 +299,12 @@ async fn do_update_logging_for_days(
     let mut with_transmission_error = std::vec::Vec::new();
     for day in days {
         for entry in &day.entries {
-            if confirmed_issues.contains(&entry.key)
-               && !entry.duration.is_zero() {
-                let new_worklog = NewWorklogEntry{
+            if confirmed_issues.contains(&entry.key) && !entry.duration.is_zero() {
+                let new_worklog = NewWorklogEntry {
                     comment: itertools::join(&entry.sub_keys, " "),
-                    started: day.date.and_time(entry.start_ts)
+                    started: day
+                        .date
+                        .and_time(entry.start_ts)
                         .ok_or(Error::MiscError("Failed to convert date".to_owned()))?,
                     time_spent_seconds: u64::try_from(entry.duration.num_seconds())?,
                 };
@@ -291,7 +313,7 @@ async fn do_update_logging_for_days(
                     Err(e) => {
                         println!("Error transmitting {:?}: {:?}", entry, e);
                         with_transmission_error.push(entry.clone());
-                    },
+                    }
                 }
             } else {
                 without_issue.push(entry.clone());
@@ -306,9 +328,8 @@ async fn do_update_logging_for_days(
 
 pub fn update_logging_for_days(
     days: &std::vec::Vec<&work_day::WorkDay>,
-    jira_config: &JiraConfig)
-    -> Result<()>
-{
+    jira_config: &JiraConfig,
+) -> Result<()> {
     let runtime = tokio::runtime::Runtime::new().expect("Failed to instantiate tokio runtime");
     runtime.block_on(do_update_logging_for_days(days, jira_config))
 }

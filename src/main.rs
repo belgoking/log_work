@@ -2,10 +2,12 @@ extern crate app_dirs;
 extern crate chrono;
 extern crate itertools;
 //extern crate hyper;
-#[macro_use] extern crate lazy_static;
+#[macro_use]
+extern crate lazy_static;
 extern crate regex;
 extern crate reqwest;
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
 extern crate structopt;
@@ -34,13 +36,17 @@ fn parse_duration(s: &str) -> Result<chrono::Duration, log_work::Error> {
             let m = c.get(4).map_or("0", |m| m.as_str());
             let m = m.parse::<i64>()?;
             return Ok(chrono::Duration::hours(h) + chrono::Duration::minutes(m));
-        },
-        None => return Err(log_work::Error::CommandLineError("Command line argument did not have the form '<hours>h <minutes>m'".to_string()))
+        }
+        None => {
+            return Err(log_work::Error::CommandLineError(
+                "Command line argument did not have the form '<hours>h <minutes>m'".to_string(),
+            ))
+        }
     }
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(about=r"Read .work-files and give summaries of worked time.
+#[structopt(about = r"Read .work-files and give summaries of worked time.
 
 The format of the .work-files is:
 -- yyyy-mm-dd DD HH:MM -- Key1: description1
@@ -70,40 +76,44 @@ H - (Halber Tag Urlaub) Half day vacation. Expected logged time is 1/2 of a
 #[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
 struct Opt {
     /// A file containing holidays and vacations
-    #[structopt(short="H", long="holidays", parse(from_os_str))]
+    #[structopt(short = "H", long = "holidays", parse(from_os_str))]
     holidays: Option<std::path::PathBuf>,
 
     /// Write debugging output
-    #[structopt(short="d", long="debug")]
+    #[structopt(short = "d", long = "debug")]
     debug: bool,
 
     /// Print more details
-    #[structopt(short="v", long="verbose")]
+    #[structopt(short = "v", long = "verbose")]
     verbose: bool,
 
     /// Don't abort on some errors. Especially don't abort if a day does not end on a pause.
-    #[structopt(short="l", long="lenient")]
+    #[structopt(short = "l", long = "lenient")]
     be_lenient: bool,
 
     /// Log the times of the days to the configured JIRA server
-    #[structopt(long="log_to_jira")]
+    #[structopt(long = "log_to_jira")]
     log_to_jira: bool,
 
     /// The duration of a work-day matching the expressoin '(\d+h)? ?(\d+m)?' with the first part
     /// denominating the hours and the second part the minutes.
-    #[structopt(short="u", long="duration_of_day", parse(try_from_str="parse_duration"))]
+    #[structopt(
+        short = "u",
+        long = "duration_of_day",
+        parse(try_from_str = "parse_duration")
+    )]
     duration_of_day: Option<chrono::Duration>,
 
     /// The base URL of the JIRA server (e.g. 'https://jira.example.com/jira')
-    #[structopt(long="jira_base_url")]
+    #[structopt(long = "jira_base_url")]
     jira_base_url: Option<String>,
 
     /// The username of the JIRA user
-    #[structopt(long="jira_username")]
+    #[structopt(long = "jira_username")]
     jira_username: Option<String>,
 
     /// The password of the JIRA user
-    #[structopt(long="jira_password")]
+    #[structopt(long = "jira_password")]
     jira_password: Option<String>,
 
     /// The .work-files
@@ -113,7 +123,7 @@ struct Opt {
 
 impl Opt {
     fn new() -> Opt {
-        Opt{
+        Opt {
             holidays: None,
             debug: false,
             verbose: false,
@@ -123,7 +133,8 @@ impl Opt {
             jira_base_url: None,
             jira_username: None,
             jira_password: None,
-            files: Vec::new()}
+            files: Vec::new(),
+        }
     }
 }
 
@@ -135,21 +146,24 @@ fn first_available<T>(opt1: Option<T>, opt2: Option<T>) -> Option<T> {
 }
 
 fn main() {
-    let mut opt_from_file =
-        if let Ok(mut rc_file) = app_dirs::get_app_root(app_dirs::AppDataType::UserConfig, &APP_INFO)
-        {
-            rc_file.push("log_work.rc");
-            println!("Application directory: {:?}", rc_file);
-            if let Ok(f) = std::fs::File::open(rc_file) {
-                let mut lines: Vec<String> = std::io::BufReader::new(f).lines().map(|e| e.unwrap()).collect();
-                lines.insert(0, "DUMMY".to_string()); // normally the first element holds the program name
-                Opt::from_iter(lines.iter())
-            } else {
-                Opt::new()
-            }
+    let mut opt_from_file = if let Ok(mut rc_file) =
+        app_dirs::get_app_root(app_dirs::AppDataType::UserConfig, &APP_INFO)
+    {
+        rc_file.push("log_work.rc");
+        println!("Application directory: {:?}", rc_file);
+        if let Ok(f) = std::fs::File::open(rc_file) {
+            let mut lines: Vec<String> = std::io::BufReader::new(f)
+                .lines()
+                .map(|e| e.unwrap())
+                .collect();
+            lines.insert(0, "DUMMY".to_string()); // normally the first element holds the program name
+            Opt::from_iter(lines.iter())
         } else {
             Opt::new()
-        };
+        }
+    } else {
+        Opt::new()
+    };
     let opt_from_args = Opt::from_args();
 
     if opt_from_args.debug || opt_from_file.debug {
@@ -157,18 +171,21 @@ fn main() {
     }
     let mut files = opt_from_args.files;
     files.append(&mut opt_from_file.files);
-    let opt = Opt{
-            holidays: first_available(opt_from_args.holidays, opt_from_file.holidays),
-            debug: opt_from_args.debug || opt_from_file.debug,
-            verbose: opt_from_args.verbose || opt_from_file.verbose,
-            be_lenient: opt_from_args.be_lenient || opt_from_file.be_lenient,
-            log_to_jira: opt_from_args.log_to_jira, // here we actually ignore the options from the file
-            duration_of_day: first_available(opt_from_args.duration_of_day, opt_from_file.duration_of_day),
-            jira_base_url: first_available(opt_from_args.jira_base_url, opt_from_file.jira_base_url),
-            jira_username: first_available(opt_from_args.jira_username, opt_from_file.jira_username),
-            jira_password: first_available(opt_from_args.jira_password, opt_from_file.jira_password),
-            files: files
-        };
+    let opt = Opt {
+        holidays: first_available(opt_from_args.holidays, opt_from_file.holidays),
+        debug: opt_from_args.debug || opt_from_file.debug,
+        verbose: opt_from_args.verbose || opt_from_file.verbose,
+        be_lenient: opt_from_args.be_lenient || opt_from_file.be_lenient,
+        log_to_jira: opt_from_args.log_to_jira, // here we actually ignore the options from the file
+        duration_of_day: first_available(
+            opt_from_args.duration_of_day,
+            opt_from_file.duration_of_day,
+        ),
+        jira_base_url: first_available(opt_from_args.jira_base_url, opt_from_file.jira_base_url),
+        jira_username: first_available(opt_from_args.jira_username, opt_from_file.jira_username),
+        jira_password: first_available(opt_from_args.jira_password, opt_from_file.jira_password),
+        files: files,
+    };
 
     if opt.debug {
         println!("opt={:?}", opt);
@@ -201,33 +218,53 @@ fn main() {
         return;
     };
     let first_date = &work_days_raw[0].as_ref().unwrap().date;
-    let (min_day, max_day) = work_days_raw.iter().fold((*first_date, *first_date),
-                                                |(min, max), ref day| {
-                                                    let date = &day.as_ref().unwrap().date;
-                                                    (std::cmp::min(min, *date), std::cmp::max(max, *date))
-                                                });
+    let (min_day, max_day) =
+        work_days_raw
+            .iter()
+            .fold((*first_date, *first_date), |(min, max), ref day| {
+                let date = &day.as_ref().unwrap().date;
+                (std::cmp::min(min, *date), std::cmp::max(max, *date))
+            });
     if opt.debug {
         println!("min={} max={}", min_day.format("%F"), max_day.format("%F"));
     }
-    let duration_of_day = if let Some(d) = opt.duration_of_day { d } else { chrono::Duration::hours(8) };
-    let required_time =
-        match opt.holidays {
-            Some(fp) => {
-                let required_time = log_work::required_time::parse_required_time_file(&fp).expect("Error parsing required time file");
-                log_work::required_time::consolidate_required_time(&required_time, &min_day, &max_day, &duration_of_day)
-                   .expect("Failed to consolidate required times")
-            },
-            None => {
-                let empty = Vec::new();
-                log_work::required_time::consolidate_required_time(&empty, &min_day, &max_day, &duration_of_day)
-                    .expect("Failed to consolidate required times")
-            },
-        };
+    let duration_of_day = if let Some(d) = opt.duration_of_day {
+        d
+    } else {
+        chrono::Duration::hours(8)
+    };
+    let required_time = match opt.holidays {
+        Some(fp) => {
+            let required_time = log_work::required_time::parse_required_time_file(&fp)
+                .expect("Error parsing required time file");
+            log_work::required_time::consolidate_required_time(
+                &required_time,
+                &min_day,
+                &max_day,
+                &duration_of_day,
+            )
+            .expect("Failed to consolidate required times")
+        }
+        None => {
+            let empty = Vec::new();
+            log_work::required_time::consolidate_required_time(
+                &empty,
+                &min_day,
+                &max_day,
+                &duration_of_day,
+            )
+            .expect("Failed to consolidate required times")
+        }
+    };
     if opt.debug {
         println!("Required-times: {:?}", required_time);
     }
 
-    let days = log_work::work_day::Days::join_work_and_requirement(&work_day_by_date, &required_time, &duration_of_day);
+    let days = log_work::work_day::Days::join_work_and_requirement(
+        &work_day_by_date,
+        &required_time,
+        &duration_of_day,
+    );
     if opt.debug {
         for ref day in &days.days {
             println!("Required-times for {:?}: {:?}", day.required_time.date, day);
@@ -237,46 +274,75 @@ fn main() {
     let mut summary = log_work::work_day::Summary::new();
     let mut sum_required = chrono::Duration::hours(0);
     for ref day in &days.days {
-        println!("{}", log_work::work_day::DaySummary{day: &day, verbose: opt.verbose});
-        log_work::work_day::WorkDay::merge_summaries_right_into_left(&mut summary, &day.work_day.compute_summary());
+        println!(
+            "{}",
+            log_work::work_day::DaySummary {
+                day: &day,
+                verbose: opt.verbose
+            }
+        );
+        log_work::work_day::WorkDay::merge_summaries_right_into_left(
+            &mut summary,
+            &day.work_day.compute_summary(),
+        );
         sum_required = sum_required + day.required_time.required_time;
     }
     if days.days.len() > 1 {
         println!("= Summary for all days:");
         let mut sum = chrono::Duration::hours(0);
         for (key, duration) in summary.iter() {
-            println!("{:20}:{:>20}", key, log_work::util::WorkDuration{ duration_of_day, duration: *duration });
+            println!(
+                "{:20}:{:>20}",
+                key,
+                log_work::util::WorkDuration {
+                    duration_of_day,
+                    duration: *duration
+                }
+            );
             if key != "Pause" {
                 sum = sum + *duration;
             }
         }
-        println!("{:20}: {:>20}", " == Required ==",
-                 log_work::util::WorkDuration{duration: sum_required, duration_of_day});
-        println!("{:20}: {:>20}", " == Total ==",
-                 log_work::util::WorkDuration{ duration_of_day, duration: sum });
+        println!(
+            "{:20}: {:>20}",
+            " == Required ==",
+            log_work::util::WorkDuration {
+                duration: sum_required,
+                duration_of_day
+            }
+        );
+        println!(
+            "{:20}: {:>20}",
+            " == Total ==",
+            log_work::util::WorkDuration {
+                duration_of_day,
+                duration: sum
+            }
+        );
     }
     if opt.log_to_jira {
         if opt.be_lenient {
             println!("ERROR: Updating JIRA-logging is forbidden in lenient mode!");
         } else {
-            let jira_config =
-                log_work::jira::JiraConfig{
-                    base_url: opt.jira_base_url.expect("Missing JIRA base URL"),
-                    username: opt.jira_username.expect("Missing JIRA username"),
-                    password: opt.jira_password.clone(),
-                };
+            let jira_config = log_work::jira::JiraConfig {
+                base_url: opt.jira_base_url.expect("Missing JIRA base URL"),
+                username: opt.jira_username.expect("Missing JIRA username"),
+                password: opt.jira_password.clone(),
+            };
 
-            let result =
-                log_work::jira::update_logging_for_days(
-                    &days.days.iter().map(|day| &day.work_day).collect(),
-                    &jira_config
-                    );
+            let result = log_work::jira::update_logging_for_days(
+                &days.days.iter().map(|day| &day.work_day).collect(),
+                &jira_config,
+            );
             match result {
                 Ok(()) => {
                     println!("Successfully updated JIRA time logging");
-                },
+                }
                 Err(e) => {
-                    println!("Sending the data to JIRA yielded the following result: {:?}", e);
+                    println!(
+                        "Sending the data to JIRA yielded the following result: {:?}",
+                        e
+                    );
                 }
             }
         }
