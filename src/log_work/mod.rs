@@ -59,7 +59,7 @@ impl PartialEq for Error {
             (
                 &Error::InvalidFileNameError { file: ref s_file },
                 &Error::InvalidFileNameError { file: ref o_file },
-            ) => (s_file == o_file),
+            ) => s_file == o_file,
             (
                 &Error::ParseDayTypeError {
                     file: ref s_file,
@@ -69,7 +69,7 @@ impl PartialEq for Error {
                     file: ref o_file,
                     line_nr: o_line_nr,
                 },
-            ) => (s_file == o_file && s_line_nr == o_line_nr),
+            ) => s_file == o_file && s_line_nr == o_line_nr,
             (
                 &Error::TimeNotMonotonicError {
                     file: ref s_file,
@@ -79,7 +79,7 @@ impl PartialEq for Error {
                     file: ref o_file,
                     line_nr: o_line_nr,
                 },
-            ) => (s_file == o_file && s_line_nr == o_line_nr),
+            ) => s_file == o_file && s_line_nr == o_line_nr,
             (
                 &Error::DuplicateDateError {
                     file: ref s_file,
@@ -89,7 +89,7 @@ impl PartialEq for Error {
                     file: ref o_file,
                     line_nr: o_line_nr,
                 },
-            ) => (s_file == o_file && s_line_nr == o_line_nr),
+            ) => s_file == o_file && s_line_nr == o_line_nr,
             (
                 &Error::EntryAfterSeparatorError {
                     file: ref s_file,
@@ -99,15 +99,15 @@ impl PartialEq for Error {
                     file: ref o_file,
                     line_nr: o_line_nr,
                 },
-            ) => (s_file == o_file && s_line_nr == o_line_nr),
+            ) => s_file == o_file && s_line_nr == o_line_nr,
             (
                 &Error::MissingDateError { file: ref s_file },
                 &Error::MissingDateError { file: ref o_file },
-            ) => (s_file == o_file),
+            ) => s_file == o_file,
             (
                 &Error::MissingFinalPauseError { file: ref s_file },
                 &Error::MissingFinalPauseError { file: ref o_file },
-            ) => (s_file == o_file),
+            ) => s_file == o_file,
             (
                 &Error::UnexpectedDateError {
                     file: ref s_file,
@@ -122,10 +122,10 @@ impl PartialEq for Error {
                     found_date: ref o_found_date,
                 },
             ) => {
-                (s_file == o_file
+                s_file == o_file
                     && s_line_nr == o_line_nr
                     && s_expected_date == o_expected_date
-                    && s_found_date == o_found_date)
+                    && s_found_date == o_found_date
             }
             _ => return false,
         }
