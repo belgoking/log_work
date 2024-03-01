@@ -34,13 +34,11 @@ fn parse_duration(s: &str) -> Result<chrono::Duration, log_work::Error> {
             let h = h.parse::<i64>()?;
             let m = c.get(4).map_or("0", |m| m.as_str());
             let m = m.parse::<i64>()?;
-            return Ok(chrono::Duration::hours(h) + chrono::Duration::minutes(m));
+            Ok(chrono::Duration::hours(h) + chrono::Duration::minutes(m))
         }
-        None => {
-            return Err(log_work::Error::CommandLineError(
-                "Command line argument did not have the form '<hours>h <minutes>m'".to_string(),
-            ))
-        }
+        None => Err(log_work::Error::CommandLineError(
+            "Command line argument did not have the form '<hours>h <minutes>m'".to_string(),
+        )),
     }
 }
 
