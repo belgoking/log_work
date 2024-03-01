@@ -184,7 +184,7 @@ fn main() {
         jira_base_url: first_available(opt_from_args.jira_base_url, opt_from_file.jira_base_url),
         jira_username: first_available(opt_from_args.jira_username, opt_from_file.jira_username),
         jira_password: first_available(opt_from_args.jira_password, opt_from_file.jira_password),
-        files: files,
+        files,
     };
 
     if opt.debug {
