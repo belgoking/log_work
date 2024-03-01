@@ -45,7 +45,7 @@ fn parse_duration(s: &str) -> Result<chrono::Duration, log_work::Error> {
     }
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, structopt::StructOpt)]
 #[structopt(about = r"Read .work-files and give summaries of worked time.
 
 The format of the .work-files is:
@@ -73,7 +73,7 @@ H - (Halber Tag Urlaub) Half day vacation. Expected logged time is 1/2 of a
     This is just a marker, such that no warning regarding a missing day is
     generated.
 ")]
-#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
+#[structopt(setting = structopt::clap::AppSettings::ColoredHelp)]
 struct Opt {
     /// A file containing holidays and vacations
     #[structopt(short = "H", long = "holidays", parse(from_os_str))]
@@ -100,7 +100,7 @@ struct Opt {
     #[structopt(
         short = "u",
         long = "duration_of_day",
-        parse(try_from_str = "parse_duration")
+        parse(try_from_str = parse_duration)
     )]
     duration_of_day: Option<chrono::Duration>,
 
