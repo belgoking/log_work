@@ -2,7 +2,7 @@
 name = "log_work"
 version = "0.1.0"
 authors = ["belgoking <belgoking@gmx.de>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 regex = "0.2"
