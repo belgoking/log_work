@@ -1,15 +1,3 @@
-extern crate chrono;
-extern crate itertools;
-//extern crate hyper;
-#[macro_use]
-extern crate lazy_static;
-extern crate regex;
-extern crate reqwest;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde;
-extern crate serde_json;
-extern crate structopt;
 
 mod log_work;
 

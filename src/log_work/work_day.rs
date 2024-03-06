@@ -80,7 +80,7 @@ impl WorkDay {
     }
 
     fn parse_entries_line<'a>(line: &'a str) -> EntriesLine<'a> {
-        lazy_static! {
+        lazy_static::lazy_static! {
             static ref RE: regex::Regex = regex::Regex::new(
                 r"^-- (\d{4})-(\d{2})-(\d{2}) ([^ ]+ )?(\d{2}):(\d{2}) -- (.*)
 ?$"
@@ -289,7 +289,7 @@ impl WorkDay {
     }
 
     pub fn parse_file(file_name: &std::path::PathBuf, be_lenient: bool) -> Result<WorkDay> {
-        lazy_static! {
+        lazy_static::lazy_static! {
             static ref RE: regex::Regex =
                 regex::Regex::new(r"(^|/)(\d{4})(\d{2})(\d{2})(_.*)\.work$")
                     .expect("Erronuous Regular Expression");

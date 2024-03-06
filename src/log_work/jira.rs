@@ -42,22 +42,22 @@ pub struct JiraConfig {
     pub password: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug)]
 struct ResponseWithIssues {
     issues: Vec<Issue>,
 }
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug)]
 struct Issue {
     key: String,
 }
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Eq, PartialEq, Debug)]
 struct ResponseWithWorklogs {
     worklogs: Vec<StoredWorklogEntry>,
 }
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Eq, PartialEq, Debug)]
 struct StoredWorklogEntry {
     comment: String,
     started: DateTime,
@@ -69,12 +69,12 @@ struct StoredWorklogEntry {
     author: WorklogAuthor,
 }
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug)]
 struct WorklogAuthor {
     name: String,
 }
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Eq, PartialEq, Debug)]
 struct NewWorklogEntry {
     comment: String,
     #[serde(with = "my_date_format")]
@@ -182,7 +182,7 @@ async fn is_jira_issue(
 }
 
 fn has_jira_key_structure(candidate: &str) -> bool {
-    lazy_static! {
+    lazy_static::lazy_static! {
         static ref RE: regex::Regex =
             regex::Regex::new(r"^[^- ]+-[0-9]+$").expect("Erronuous expression for JIRA issue key");
     }
