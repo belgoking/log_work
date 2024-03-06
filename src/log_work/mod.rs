@@ -6,7 +6,7 @@ pub mod work_day;
 extern crate chrono;
 //use chrono::TimeZone;
 
-type Date = chrono::Date<chrono::Local>;
+type Date = chrono::NaiveDate;
 type DateTime = chrono::DateTime<chrono::Local>;
 type Time = chrono::NaiveTime;
 
