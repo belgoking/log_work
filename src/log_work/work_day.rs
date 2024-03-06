@@ -148,7 +148,7 @@ impl WorkDay {
         }
         if line == "" {
             if expected_date.is_none() {
-                return Err(Error::MissingDateError {
+                return Err(Error::MissingDate {
                     file: file.to_string(),
                 });
             }
@@ -176,7 +176,7 @@ impl WorkDay {
         while !line.is_empty() {
             line_nr += 1;
             if let EntriesLine::Captures(_) = WorkDay::parse_entries_line(&line) {
-                return Err(Error::EntryAfterSeparatorError {
+                return Err(Error::EntryAfterSeparator {
                     file: file.to_string(),
                     line_nr,
                 });
@@ -194,7 +194,7 @@ impl WorkDay {
                         file
                     );
                 } else {
-                    return Err(Error::MissingFinalPauseError {
+                    return Err(Error::MissingFinalPause {
                         file: file.to_string(),
                     });
                 }
@@ -209,7 +209,7 @@ impl WorkDay {
                     additional_text,
                 })
             }
-            None => Err(Error::MissingDateError {
+            None => Err(Error::MissingDate {
                 file: file.to_string(),
             }),
         }
@@ -233,7 +233,7 @@ impl WorkDay {
                 Some(expected_date) => {
                     let found_date = entry_raw.start_ts.date();
                     if expected_date != found_date {
-                        return Err(Error::UnexpectedDateError {
+                        return Err(Error::UnexpectedDate {
                             file: file.to_string(),
                             line_nr: *line_nr,
                             expected_date,
@@ -261,7 +261,7 @@ impl WorkDay {
                         entry_raw =
                             WorkDay::parse_entry(&c[1], &c[2], &c[3], &c[5], &c[6], &c[7], &line)?;
                         if expected_date != entry_raw.start_ts.date() {
-                            return Err(Error::UnexpectedDateError {
+                            return Err(Error::UnexpectedDate {
                                 file: file.to_string(),
                                 line_nr: *line_nr,
                                 expected_date,
@@ -269,7 +269,7 @@ impl WorkDay {
                             });
                         }
                         if last_ts > entry_raw.start_ts {
-                            return Err(Error::TimeNotMonotonicError {
+                            return Err(Error::TimeNotMonotonic {
                                 file: file.to_string(),
                                 line_nr: *line_nr,
                             });
@@ -298,7 +298,7 @@ impl WorkDay {
         let file_name_str = match file_name.to_str() {
             Some(fi) => fi,
             None => {
-                return Err(Error::InvalidFileNameError {
+                return Err(Error::InvalidFileName {
                     file: file_name.clone(),
                 })
             }
@@ -477,7 +477,7 @@ mod tests {
         let mut txt = io::BufReader::new(txt);
         let expected_date = chrono::Local.ymd(2018, 5, 3);
         let entries = WorkDay::parse(&mut txt, Some(expected_date), false, "tst_file");
-        let expected_error = Err(Error::UnexpectedDateError {
+        let expected_error = Err(Error::UnexpectedDate {
             file: "tst_file".to_string(),
             line_nr: 1,
             expected_date,
@@ -495,7 +495,7 @@ mod tests {
         let mut txt = io::BufReader::new(txt);
         let expected_date = chrono::Local.ymd(2018, 5, 3);
         let entries = WorkDay::parse(&mut txt, Some(expected_date), false, "tst_file");
-        let expected_error = Err(Error::UnexpectedDateError {
+        let expected_error = Err(Error::UnexpectedDate {
             file: "tst_file".to_string(),
             line_nr: 3,
             expected_date,
@@ -513,7 +513,7 @@ mod tests {
         let mut txt = io::BufReader::new(txt);
         let expected_date = chrono::Local.ymd(2018, 5, 3);
         let entries = WorkDay::parse(&mut txt, Some(expected_date), false, "tst_file");
-        let expected_error = Err(Error::UnexpectedDateError {
+        let expected_error = Err(Error::UnexpectedDate {
             file: "tst_file".to_string(),
             line_nr: 3,
             expected_date,
@@ -528,7 +528,7 @@ mod tests {
 -- 2018-05-04 Mo 12:26 -- Foo Bar Baz";
         let mut txt = io::BufReader::new(txt.as_bytes());
         let entries = WorkDay::parse(&mut txt, None, false, "tst_file");
-        let expected_error = Err(Error::TimeNotMonotonicError {
+        let expected_error = Err(Error::TimeNotMonotonic {
             file: "tst_file".to_string(),
             line_nr: 2,
         });
@@ -543,7 +543,7 @@ mod tests {
 -- 2018-05-04 Mo 12:39 -- Baz";
         let mut txt = io::BufReader::new(txt.as_bytes());
         let entries = WorkDay::parse(&mut txt, None, false, "tst_file");
-        let expected_error = Err(Error::EntryAfterSeparatorError {
+        let expected_error = Err(Error::EntryAfterSeparator {
             file: "tst_file".to_string(),
             line_nr: 4,
         });
@@ -557,7 +557,7 @@ mod tests {
 -- 2018-05-04 Mo 12:39 -- Baz";
         let mut txt = io::BufReader::new(txt.as_bytes());
         let entries = WorkDay::parse(&mut txt, None, false, "tst_file");
-        let expected_error = Err(Error::MissingFinalPauseError {
+        let expected_error = Err(Error::MissingFinalPause {
             file: "tst_file".to_string(),
         });
         assert_eq!(expected_error, entries);

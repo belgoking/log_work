@@ -12,35 +12,35 @@ type Time = chrono::NaiveTime;
 
 #[derive(Debug)]
 pub enum Error {
-    CommandLineError(String),
-    IOError(std::io::Error),
-    ParseIntError(std::num::ParseIntError),
-    InvalidFileNameError {
+    CommandLine(String),
+    IO(std::io::Error),
+    ParseInt(std::num::ParseIntError),
+    InvalidFileName {
         file: std::path::PathBuf,
     },
-    ParseDayTypeError {
+    ParseDayType {
         file: String,
         line_nr: u32,
     },
-    TimeNotMonotonicError {
+    TimeNotMonotonic {
         file: String,
         line_nr: u32,
     },
-    DuplicateDateError {
+    DuplicateDate {
         file: String,
         line_nr: u32,
     },
-    EntryAfterSeparatorError {
+    EntryAfterSeparator {
         file: String,
         line_nr: u32,
     },
-    MissingDateError {
+    MissingDate {
         file: String,
     },
-    MissingFinalPauseError {
+    MissingFinalPause {
         file: String,
     },
-    UnexpectedDateError {
+    UnexpectedDate {
         file: String,
         line_nr: u32,
         expected_date: Date,
@@ -51,69 +51,69 @@ pub enum Error {
 impl PartialEq for Error {
     fn eq(&self, other: &Error) -> bool {
         match (self, other) {
-            (&Error::CommandLineError(ref s), &Error::CommandLineError(ref o)) => s == o,
-            (&Error::IOError(_), &Error::IOError(_)) => true,
-            (&Error::ParseIntError(_), &Error::ParseIntError(_)) => true,
+            (&Error::CommandLine(ref s), &Error::CommandLine(ref o)) => s == o,
+            (&Error::IO(_), &Error::IO(_)) => true,
+            (&Error::ParseInt(_), &Error::ParseInt(_)) => true,
             (
-                &Error::InvalidFileNameError { file: ref s_file },
-                &Error::InvalidFileNameError { file: ref o_file },
+                &Error::InvalidFileName { file: ref s_file },
+                &Error::InvalidFileName { file: ref o_file },
             ) => s_file == o_file,
             (
-                &Error::ParseDayTypeError {
+                &Error::ParseDayType {
                     file: ref s_file,
                     line_nr: s_line_nr,
                 },
-                &Error::ParseDayTypeError {
+                &Error::ParseDayType {
                     file: ref o_file,
                     line_nr: o_line_nr,
                 },
             ) => s_file == o_file && s_line_nr == o_line_nr,
             (
-                &Error::TimeNotMonotonicError {
+                &Error::TimeNotMonotonic {
                     file: ref s_file,
                     line_nr: s_line_nr,
                 },
-                &Error::TimeNotMonotonicError {
+                &Error::TimeNotMonotonic {
                     file: ref o_file,
                     line_nr: o_line_nr,
                 },
             ) => s_file == o_file && s_line_nr == o_line_nr,
             (
-                &Error::DuplicateDateError {
+                &Error::DuplicateDate {
                     file: ref s_file,
                     line_nr: s_line_nr,
                 },
-                &Error::DuplicateDateError {
+                &Error::DuplicateDate {
                     file: ref o_file,
                     line_nr: o_line_nr,
                 },
             ) => s_file == o_file && s_line_nr == o_line_nr,
             (
-                &Error::EntryAfterSeparatorError {
+                &Error::EntryAfterSeparator {
                     file: ref s_file,
                     line_nr: s_line_nr,
                 },
-                &Error::EntryAfterSeparatorError {
+                &Error::EntryAfterSeparator {
                     file: ref o_file,
                     line_nr: o_line_nr,
                 },
             ) => s_file == o_file && s_line_nr == o_line_nr,
             (
-                &Error::MissingDateError { file: ref s_file },
-                &Error::MissingDateError { file: ref o_file },
+                &Error::MissingDate { file: ref s_file },
+                &Error::MissingDate { file: ref o_file },
             ) => s_file == o_file,
             (
-                &Error::MissingFinalPauseError { file: ref s_file },
-                &Error::MissingFinalPauseError { file: ref o_file },
+                &Error::MissingFinalPause { file: ref s_file },
+                &Error::MissingFinalPause { file: ref o_file },
             ) => s_file == o_file,
             (
-                &Error::UnexpectedDateError {
+                &Error::UnexpectedDate {
                     file: ref s_file,
                     line_nr: s_line_nr,
                     expected_date: ref s_expected_date,
                     found_date: ref s_found_date,
                 },
-                &Error::UnexpectedDateError {
+                &Error::UnexpectedDate {
                     file: ref o_file,
                     line_nr: o_line_nr,
                     expected_date: ref o_expected_date,
@@ -133,33 +133,33 @@ impl PartialEq for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            Error::CommandLineError(ref s) => write!(f, "CommandLineError: {}", s),
-            Error::IOError(ref err) => write!(f, "IOError: {}", err),
-            Error::ParseIntError(ref err) => write!(f, "ParseIntError: {}", err),
-            Error::InvalidFileNameError { ref file } => {
+            Error::CommandLine(ref s) => write!(f, "CommandLineError: {}", s),
+            Error::IO(ref err) => write!(f, "IOError: {}", err),
+            Error::ParseInt(ref err) => write!(f, "ParseIntError: {}", err),
+            Error::InvalidFileName { ref file } => {
                 write!(f, "InvalidFileNameError: {:?}", file)
             }
-            Error::ParseDayTypeError {
+            Error::ParseDayType {
                 ref file,
                 ref line_nr,
             } => write!(f, "ParseDayTypeError: {}:{}", file, line_nr),
-            Error::TimeNotMonotonicError {
+            Error::TimeNotMonotonic {
                 ref file,
                 ref line_nr,
             } => write!(f, "TimeNotMonotonicError: {}:{}", file, line_nr),
-            Error::DuplicateDateError {
+            Error::DuplicateDate {
                 ref file,
                 ref line_nr,
             } => write!(f, "DuplicateDateError: {}:{}", file, line_nr),
-            Error::EntryAfterSeparatorError {
+            Error::EntryAfterSeparator {
                 ref file,
                 ref line_nr,
             } => write!(f, "EntryAfterSeparatorError: {}:{}", file, line_nr),
-            Error::MissingDateError { ref file } => write!(f, "MissingDateError: {}", file),
-            Error::MissingFinalPauseError { ref file } => {
+            Error::MissingDate { ref file } => write!(f, "MissingDateError: {}", file),
+            Error::MissingFinalPause { ref file } => {
                 write!(f, "MissingFinalPauseError: {}", file)
             }
-            Error::UnexpectedDateError {
+            Error::UnexpectedDate {
                 ref file,
                 ref line_nr,
                 ref expected_date,
@@ -175,13 +175,13 @@ impl std::fmt::Display for Error {
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
-        Error::IOError(err)
+        Error::IO(err)
     }
 }
 
 impl From<std::num::ParseIntError> for Error {
     fn from(err: std::num::ParseIntError) -> Error {
-        Error::ParseIntError(err)
+        Error::ParseInt(err)
     }
 }
 

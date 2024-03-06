@@ -1,4 +1,3 @@
-
 mod log_work;
 
 use structopt::StructOpt;
@@ -24,7 +23,7 @@ fn parse_duration(s: &str) -> Result<chrono::Duration, log_work::Error> {
             let m = m.parse::<i64>()?;
             Ok(chrono::Duration::hours(h) + chrono::Duration::minutes(m))
         }
-        None => Err(log_work::Error::CommandLineError(
+        None => Err(log_work::Error::CommandLine(
             "Command line argument did not have the form '<hours>h <minutes>m'".to_string(),
         )),
     }

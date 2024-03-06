@@ -85,7 +85,7 @@ fn check_day_types(orig: &DayTypeEntry, new_entry: &DayTypeEntry) -> Result<()> 
         match orig.day_type {
             DayType::JobTravel { description: _ } => (),
             _ => {
-                return Err(Error::DuplicateDateError {
+                return Err(Error::DuplicateDate {
                     file: "".to_string(), /*orig.file.clone()*/
                     line_nr: orig.line_nr,
                 });
@@ -98,7 +98,7 @@ fn check_day_types(orig: &DayTypeEntry, new_entry: &DayTypeEntry) -> Result<()> 
         match new_entry.day_type {
             DayType::JobTravel { description: _ } => (),
             _ => {
-                return Err(Error::DuplicateDateError {
+                return Err(Error::DuplicateDate {
                     file: "".to_string(), /*new_entry.file.clone()*/
                     line_nr: new_entry.line_nr,
                 });
@@ -247,7 +247,7 @@ pub fn parse_required_time_file(file_name: &std::path::PathBuf) -> Result<Vec<Da
     let file_name_str = match file_name.to_str() {
         Some(fi) => fi,
         None => {
-            return Err(Error::InvalidFileNameError {
+            return Err(Error::InvalidFileName {
                 file: file_name.clone(),
             })
         }
@@ -294,14 +294,14 @@ fn day_type_from_str(s: &str, file_name: &str, line_nr: u32) -> Result<DayType> 
                 })
             }
             _ => {
-                return Err(Error::ParseDayTypeError {
+                return Err(Error::ParseDayType {
                     file: file_name.to_string(),
                     line_nr,
                 })
             }
         },
         None => {
-            return Err(Error::ParseDayTypeError {
+            return Err(Error::ParseDayType {
                 file: file_name.to_string(),
                 line_nr,
             });
@@ -336,7 +336,7 @@ pub fn parse_required_time(
                 None => (start_date, false),
             };
             if start_date > end_date {
-                return Err(Error::ParseDayTypeError {
+                return Err(Error::ParseDayType {
                     file: file_name.to_string(),
                     line_nr,
                 });
@@ -492,7 +492,7 @@ bar
     fn test_parse_required_time_with_unknown_type_error() {
         let txt: &str = r"2018-05-04 -- F This is: a holiday
 2018-05-07 -- u A half day";
-        let expected = Err(Error::ParseDayTypeError {
+        let expected = Err(Error::ParseDayType {
             file: "tst_file".to_string(),
             line_nr: 2,
         });
@@ -502,7 +502,7 @@ bar
     #[test]
     fn test_parse_required_time_with_invalid_range_error() {
         let txt: &str = r"2018-05-04--2018-04-05 -- F This is: a holiday";
-        let expected = Err(Error::ParseDayTypeError {
+        let expected = Err(Error::ParseDayType {
             file: "tst_file".to_string(),
             line_nr: 1,
         });
@@ -604,7 +604,7 @@ bar
             &chrono::Local.ymd(2018, 5, 5),
             &full_day_duration,
         );
-        let expected = Err(Error::DuplicateDateError {
+        let expected = Err(Error::DuplicateDate {
             file: "".to_string(),
             line_nr: 5,
         });
@@ -628,7 +628,7 @@ bar
             &chrono::Local.ymd(2018, 5, 5),
             &full_day_duration,
         );
-        let expected = Err(Error::DuplicateDateError {
+        let expected = Err(Error::DuplicateDate {
             file: "".to_string(),
             line_nr: 5,
         });
