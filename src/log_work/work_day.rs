@@ -1,7 +1,3 @@
-extern crate chrono;
-use self::chrono::TimeZone;
-extern crate regex;
-
 use self::util;
 use super::*;
 use std;
@@ -55,7 +51,7 @@ impl Entry {
             sub_keys: old_entry.sub_keys,
             raw_data: old_entry.raw_data,
         });
-        return ret;
+        ret
     }
 }
 
@@ -79,7 +75,7 @@ impl WorkDay {
         Ok(((num_bytes != 0 && line != "\n"), line))
     }
 
-    fn parse_entries_line<'a>(line: &'a str) -> EntriesLine<'a> {
+    fn parse_entries_line(line: &str) -> EntriesLine {
         lazy_static::lazy_static! {
             static ref RE: regex::Regex = regex::Regex::new(
                 r"^-- (\d{4})-(\d{2})-(\d{2}) ([^ ]+ )?(\d{2}):(\d{2}) -- (.*)
@@ -121,7 +117,9 @@ impl WorkDay {
         let minute = minute.parse::<u32>()?;
         let (key, sub_keys) = WorkDay::parse_description(desc);
         let date = util::to_date(year, month, day)?;
-        let start_ts = date.and_hms(hour, minute, 0);
+        let start_ts = date
+            .and_hms_opt(hour, minute, 0)
+            .ok_or_else(|| Error::ParseTime)?;
 
         Ok(EntryRaw {
             start_ts,
@@ -285,7 +283,7 @@ impl WorkDay {
                 }
             }
         };
-        return Ok(entries);
+        Ok(entries)
     }
 
     pub fn parse_file(file_name: &std::path::PathBuf, be_lenient: bool) -> Result<WorkDay> {
@@ -308,32 +306,29 @@ impl WorkDay {
                 let y = c[2].parse::<i32>()?;
                 let m = c[3].parse::<u32>()?;
                 let d = c[4].parse::<u32>()?;
-                match chrono::Local.ymd_opt(y, m, d) {
-                    chrono::LocalResult::Single(c) => Some(c),
-                    _ => None,
-                }
+                Date::from_ymd_opt(y, m, d)
             }
             None => None,
         };
         let file = std::fs::File::open(file_name)?;
         let mut fstream = std::io::BufReader::new(file);
-        return WorkDay::parse(&mut fstream, expected_date, be_lenient, file_name_str);
+        WorkDay::parse(&mut fstream, expected_date, be_lenient, file_name_str)
     }
 
     pub fn compute_summary(&self) -> Summary {
         let mut ret = Summary::new();
-        for ref entry in &self.entries {
+        for entry in &self.entries {
             ret.entry(entry.key.clone())
-                .and_modify(|e| *e = *e + entry.duration)
+                .and_modify(|e| *e += entry.duration)
                 .or_insert(entry.duration);
         }
-        return ret;
+        ret
     }
 
     pub fn merge_summaries_right_into_left(left: &mut Summary, right: &Summary) {
         for (k, v) in right.iter() {
             left.entry(k.to_string())
-                .and_modify(|e| *e = *e + *v)
+                .and_modify(|e| *e += *v)
                 .or_insert(*v);
         }
     }
@@ -370,12 +365,12 @@ impl<'a> std::fmt::Display for DaySummary<'a> {
                 )?;
             }
         }
-        write!(f, "= {}\n", self.day.required_time)?;
+        writeln!(f, "= {}", self.day.required_time)?;
         let mut sum = chrono::Duration::hours(0);
         for (key, duration) in self.day.work_day.compute_summary().iter() {
-            write!(
+            writeln!(
                 f,
-                "{:20}: {:>19}\n",
+                "{:20}: {:>19}",
                 key,
                 util::WorkDuration {
                     duration_of_day,
@@ -383,28 +378,28 @@ impl<'a> std::fmt::Display for DaySummary<'a> {
                 }
             )?;
             if key != "Pause" {
-                sum = sum + *duration;
+                sum += *duration;
             }
         }
-        write!(
+        writeln!(
             f,
-            "{:20}: {:>19}\n",
+            "{:20}: {:>19}",
             " == Required ==",
             util::WorkDuration {
                 duration_of_day,
                 duration: self.day.required_time.required_time
             }
         )?;
-        write!(
+        writeln!(
             f,
-            "{:20}: {:>19}\n",
+            "{:20}: {:>19}",
             " == Total ==",
             util::WorkDuration {
                 duration_of_day,
                 duration: sum
             }
         )?;
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -424,7 +419,7 @@ impl Days {
         for ref file in files {
             ret.push(WorkDay::parse_file(file, be_lenient));
         }
-        return ret;
+        ret
     }
 
     pub fn join_work_and_requirement(
@@ -434,11 +429,11 @@ impl Days {
     ) -> Days {
         let mut days = Vec::new();
         days.reserve_exact(required_times.len());
-        for ref required_time in required_times {
+        for required_time in required_times {
             let work_day: WorkDay = match work_days.get(&required_time.date) {
                 Some(day) => (*day).clone(),
                 None => WorkDay {
-                    date: required_time.date.clone(),
+                    date: required_time.date,
                     entries: Vec::new(),
                     additional_text: "".to_string(),
                 },
@@ -447,11 +442,11 @@ impl Days {
             days.push(Day {
                 duration_of_day: *duration_of_day,
                 required_time: (*required_time).clone(),
-                work_day: work_day,
+                work_day,
             });
         }
 
-        return Days { days: days };
+        Days { days }
     }
 
     //    pub fn load(mut files: Vec<std::path::PathBuf>, _special_dates_file: Option<String>) -> Days
@@ -466,7 +461,6 @@ impl Days {
 #[cfg(test)]
 mod tests {
     use self::chrono;
-    use self::chrono::TimeZone;
     use super::*;
     use std::io;
 
@@ -475,13 +469,13 @@ mod tests {
         let txt: &str = r"-- 2018-05-04 Mo 12:27 -- Foo Bar Baz";
         let txt = txt.as_bytes();
         let mut txt = io::BufReader::new(txt);
-        let expected_date = chrono::Local.ymd(2018, 5, 3);
+        let expected_date = Date::from_ymd_opt(2018, 5, 3).unwrap();
         let entries = WorkDay::parse(&mut txt, Some(expected_date), false, "tst_file");
         let expected_error = Err(Error::UnexpectedDate {
             file: "tst_file".to_string(),
             line_nr: 1,
             expected_date,
-            found_date: chrono::Local.ymd(2018, 5, 4),
+            found_date: Date::from_ymd_opt(2018, 5, 4).unwrap(),
         });
         assert_eq!(expected_error, entries);
     }
@@ -493,13 +487,13 @@ mod tests {
 -- 2018-05-04 Mo 12:27 -- Foo Bar Baz";
         let txt = txt.as_bytes();
         let mut txt = io::BufReader::new(txt);
-        let expected_date = chrono::Local.ymd(2018, 5, 3);
+        let expected_date = Date::from_ymd_opt(2018, 5, 3).unwrap();
         let entries = WorkDay::parse(&mut txt, Some(expected_date), false, "tst_file");
         let expected_error = Err(Error::UnexpectedDate {
             file: "tst_file".to_string(),
             line_nr: 3,
             expected_date,
-            found_date: chrono::Local.ymd(2018, 5, 4),
+            found_date: Date::from_ymd_opt(2018, 5, 4).unwrap(),
         });
         assert_eq!(expected_error, entries);
     }
@@ -511,13 +505,13 @@ mod tests {
 -- 2018-05-04 Mo 12:27 -- Foo Bar Baz";
         let txt = txt.as_bytes();
         let mut txt = io::BufReader::new(txt);
-        let expected_date = chrono::Local.ymd(2018, 5, 3);
+        let expected_date = Date::from_ymd_opt(2018, 5, 3).unwrap();
         let entries = WorkDay::parse(&mut txt, Some(expected_date), false, "tst_file");
         let expected_error = Err(Error::UnexpectedDate {
             file: "tst_file".to_string(),
             line_nr: 3,
             expected_date,
-            found_date: chrono::Local.ymd(2018, 5, 4),
+            found_date: Date::from_ymd_opt(2018, 5, 4).unwrap(),
         });
         assert_eq!(expected_error, entries);
     }
@@ -574,21 +568,21 @@ mod tests {
 
         let expected_entries = vec![
             Entry {
-                start_ts: Time::from_hms(12, 27, 0),
+                start_ts: Time::from_hms_opt(12, 27, 0).unwrap(),
                 duration: chrono::Duration::minutes(2),
                 key: "Foo".to_string(),
                 sub_keys: Vec::new(),
                 raw_data: "-- 2018-05-04 Mo 12:27 -- Foo\n".to_string(),
             },
             Entry {
-                start_ts: Time::from_hms(12, 29, 0),
+                start_ts: Time::from_hms_opt(12, 29, 0).unwrap(),
                 duration: chrono::Duration::minutes(10),
                 key: "Bar".to_string(),
                 sub_keys: Vec::new(),
                 raw_data: "-- 2018-05-04 Mo 12:29 -- Bar\n".to_string(),
             },
             Entry {
-                start_ts: Time::from_hms(12, 39, 0),
+                start_ts: Time::from_hms_opt(12, 39, 0).unwrap(),
                 duration: chrono::Duration::minutes(0),
                 key: "Baz".to_string(),
                 sub_keys: Vec::new(),
@@ -596,7 +590,7 @@ mod tests {
             },
         ];
         let expected = WorkDay {
-            date: chrono::Local.ymd(2018, 5, 4),
+            date: Date::from_ymd_opt(2018, 5, 4).unwrap(),
             entries: expected_entries,
             additional_text: String::new(),
         };
@@ -619,21 +613,23 @@ Hier kommt jetzt einfach nur noch geblubber
 
         let expected_entries = vec![
             Entry {
-                start_ts: Time::from_hms(12, 27, 0),
+                start_ts: Time::from_hms_opt(12, 27, 0).unwrap(),
                 duration: chrono::Duration::minutes(20),
                 key: "Foo".to_string(),
                 sub_keys: Vec::new(),
                 raw_data: "-- 2018-05-04 Mo 12:27 -- Foo\nBar Baz\n".to_string(),
             },
             Entry {
-                start_ts: Time::from_hms(12, 47, 0),
+                start_ts: Time::from_hms_opt(12, 47, 0).unwrap(),
                 duration: chrono::Duration::minutes(61),
                 key: "Bam".to_string(),
                 sub_keys: Vec::new(),
                 raw_data: "-- 2018-05-04 Mo 12:47 -- Bam\n".to_string(),
             },
             Entry {
-                start_ts: Time::from_hms(13, 48, 0),
+                start_ts: Time::from_hms_opt(13, 48, 0)
+                    .ok_or_else(|| Error::ParseTime)
+                    .unwrap(),
                 duration: chrono::Duration::minutes(0),
                 key: "Pause".to_string(),
                 sub_keys: Vec::new(),
@@ -641,7 +637,7 @@ Hier kommt jetzt einfach nur noch geblubber
             },
         ];
         let expected = WorkDay {
-            date: chrono::Local.ymd(2018, 5, 4),
+            date: Date::from_ymd_opt(2018, 5, 4).unwrap(),
             entries: expected_entries,
             additional_text: "Hier kommt jetzt einfach nur noch geblubber\n".to_string(),
         };

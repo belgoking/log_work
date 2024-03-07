@@ -7,7 +7,7 @@ extern crate chrono;
 //use chrono::TimeZone;
 
 type Date = chrono::NaiveDate;
-type DateTime = chrono::DateTime<chrono::Local>;
+type DateTime = chrono::NaiveDateTime;
 type Time = chrono::NaiveTime;
 
 #[derive(Debug)]
@@ -22,6 +22,8 @@ pub enum Error {
         file: String,
         line_nr: u32,
     },
+    ParseDay,
+    ParseTime,
     TimeNotMonotonic {
         file: String,
         line_nr: u32,
@@ -68,6 +70,8 @@ impl PartialEq for Error {
                     line_nr: o_line_nr,
                 },
             ) => s_file == o_file && s_line_nr == o_line_nr,
+            (&Error::ParseDay, &Error::ParseDay) => true,
+            (&Error::ParseTime, &Error::ParseTime) => true,
             (
                 &Error::TimeNotMonotonic {
                     file: ref s_file,
@@ -143,6 +147,8 @@ impl std::fmt::Display for Error {
                 ref file,
                 ref line_nr,
             } => write!(f, "ParseDayTypeError: {}:{}", file, line_nr),
+            Error::ParseDay => write!(f, "ParseDay"),
+            Error::ParseTime => write!(f, "ParseHour"),
             Error::TimeNotMonotonic {
                 ref file,
                 ref line_nr,

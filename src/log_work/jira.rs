@@ -85,10 +85,9 @@ struct NewWorklogEntry {
 
 mod my_date_format {
     use super::*;
-    use chrono::TimeZone as _;
     use serde::Deserialize as _;
 
-    const FORMAT: &'static str = "%Y-%m-%dT%H:%M:%S%.3f%z";
+    const FORMAT: &str = "%Y-%m-%dT%H:%M:%S%.3f%z";
 
     pub fn serialize<S>(date: &DateTime, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -103,9 +102,7 @@ mod my_date_format {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        chrono::Local
-            .datetime_from_str(&s, FORMAT)
-            .map_err(serde::de::Error::custom)
+        DateTime::parse_from_str(&s, FORMAT).map_err(serde::de::Error::custom)
     }
 }
 
@@ -302,10 +299,7 @@ async fn do_update_logging_for_days(
             if confirmed_issues.contains(&entry.key) && !entry.duration.is_zero() {
                 let new_worklog = NewWorklogEntry {
                     comment: itertools::join(&entry.sub_keys, " "),
-                    started: day
-                        .date
-                        .and_time(entry.start_ts)
-                        .ok_or(Error::MiscError("Failed to convert date".to_owned()))?,
+                    started: day.date.and_time(entry.start_ts),
                     time_spent_seconds: u64::try_from(entry.duration.num_seconds())?,
                 };
                 match post_worklog(entry.key.as_str(), &new_worklog, &client, jira_config).await {
