@@ -154,7 +154,7 @@ async fn retrieve_issues_with_worklogs(
         "/rest/api/2/search?jql=worklogAuthor%3DcurrentUser()+AND+worklogDate%3D{}",
         day.format("%Y-%m-%d")
     );
-    let issues = retrieve_json::<ResponseWithIssues>(&uri, &client, jira_config)
+    let issues = retrieve_json::<ResponseWithIssues>(&uri, client, jira_config)
         .await?
         .issues
         .drain(..)
@@ -197,13 +197,12 @@ async fn do_update_logging_for_days(
         "Retrieving issues with logs on one of the {} day(s)",
         days.len()
     );
-    for ref day in days {
+    for day in days {
         let mut issues = retrieve_issues_with_worklogs(&day.date, &client, jira_config).await?;
         issues_with_old_logs.extend(issues.drain(..));
     }
 
-    let relevant_days: std::collections::HashSet<_> =
-        days.iter().map(|ref day| day.date.clone()).collect();
+    let relevant_days: std::collections::HashSet<_> = days.iter().map(|day| day.date).collect();
 
     let my_logs = {
         let mut my_logs = std::vec::Vec::new();
@@ -264,7 +263,6 @@ async fn do_update_logging_for_days(
         .flat_map(|day| day.entries.iter())
         .map(|entry| &entry.key)
         .filter(|issue_name| has_jira_key_structure(issue_name.as_str()))
-        .map(|issue_name| issue_name)
         .collect();
 
     // don't verify issue names that we've already seen
