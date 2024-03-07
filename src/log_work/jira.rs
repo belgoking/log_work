@@ -3,34 +3,34 @@ use std::convert::TryFrom as _;
 
 #[derive(Debug)]
 pub enum Error {
-    JsonParsingError(serde_json::error::Error),
-    NetworkError(reqwest::Error),
+    JsonParsing(serde_json::error::Error),
+    Network(reqwest::Error),
     HttpErrorStatusCode(reqwest::StatusCode),
-    ConversionError(core::num::TryFromIntError),
-    MiscError(String),
+    Conversion(core::num::TryFromIntError),
+    Misc(String),
 }
 
 impl From<serde_json::error::Error> for Error {
     fn from(err: serde_json::error::Error) -> Error {
-        Error::JsonParsingError(err)
+        Error::JsonParsing(err)
     }
 }
 
 impl From<reqwest::Error> for Error {
     fn from(err: reqwest::Error) -> Error {
-        Error::NetworkError(err)
+        Error::Network(err)
     }
 }
 
 impl From<core::num::TryFromIntError> for Error {
     fn from(err: core::num::TryFromIntError) -> Error {
-        Error::ConversionError(err)
+        Error::Conversion(err)
     }
 }
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
-        Error::MiscError(format!("{:?}", err))
+        Error::Misc(format!("{:?}", err))
     }
 }
 
