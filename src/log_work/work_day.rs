@@ -632,7 +632,7 @@ Hier kommt jetzt einfach nur noch geblubber
                     .unwrap(),
                 duration: chrono::Duration::minutes(0),
                 key: "Pause".to_string(),
-                sub_keys: Vec::new(),
+                sub_keys: vec!["Blah".to_string()],
                 raw_data: "-- 2018-05-04 Mo 13:48 -- Pause Blah\n".to_string(),
             },
         ];
