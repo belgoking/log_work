@@ -1,4 +1,4 @@
-use super::*;
+use super::work_day;
 use std::convert::TryFrom as _;
 
 #[derive(Debug)]
@@ -36,10 +36,39 @@ impl From<std::io::Error> for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+type DateTime = chrono::DateTime<chrono::FixedOffset>;
+
+#[derive(Clone)]
+pub enum TimeZone {
+    Local(chrono::Local),
+    Tz(chrono_tz::Tz),
+}
+
+impl TimeZone {
+    fn to_local_date_time(
+        &self,
+        naive_date_time: &chrono::NaiveDateTime,
+    ) -> chrono::DateTime<chrono::FixedOffset> {
+        match self {
+            TimeZone::Local(tz) => naive_date_time
+                .and_local_timezone(*tz)
+                .single()
+                .unwrap()
+                .fixed_offset(),
+            TimeZone::Tz(tz) => naive_date_time
+                .and_local_timezone(*tz)
+                .single()
+                .unwrap()
+                .fixed_offset(),
+        }
+    }
+}
+
 pub struct JiraConfig {
     pub base_url: String,
     pub username: String,
     pub password: Option<String>,
+    pub timezone: TimeZone,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug)]
@@ -102,7 +131,8 @@ mod my_date_format {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        DateTime::parse_from_str(&s, FORMAT).map_err(serde::de::Error::custom)
+        chrono::DateTime::<chrono::FixedOffset>::parse_from_str(&s, FORMAT)
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -145,7 +175,7 @@ async fn post_worklog(
 }
 
 async fn retrieve_issues_with_worklogs(
-    day: &Date,
+    day: &super::Date,
     client: &reqwest::Client,
     jira_config: &JiraConfig,
 ) -> Result<Vec<String>> {
@@ -215,7 +245,7 @@ async fn do_update_logging_for_days(
                 .drain(..)
                 .filter(|entry| {
                     entry.author.name == jira_config.username
-                        && relevant_days.contains(&entry.started.date())
+                        && relevant_days.contains(&entry.started.date_naive())
                 })
                 .collect();
             my_logs.append(&mut worklogs);
@@ -297,7 +327,9 @@ async fn do_update_logging_for_days(
             if confirmed_issues.contains(&entry.key) && !entry.duration.is_zero() {
                 let new_worklog = NewWorklogEntry {
                     comment: itertools::join(&entry.sub_keys, " "),
-                    started: day.date.and_time(entry.start_ts),
+                    started: jira_config
+                        .timezone
+                        .to_local_date_time(&day.date.and_time(entry.start_ts)),
                     time_spent_seconds: u64::try_from(entry.duration.num_seconds())?,
                 };
                 match post_worklog(entry.key.as_str(), &new_worklog, &client, jira_config).await {

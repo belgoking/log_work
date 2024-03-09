@@ -75,10 +75,6 @@ struct Opt {
     #[structopt(short = "l", long = "lenient")]
     be_lenient: bool,
 
-    /// Log the times of the days to the configured JIRA server
-    #[structopt(long = "log_to_jira")]
-    log_to_jira: bool,
-
     /// The duration of a work-day matching the expressoin '(\d+h)? ?(\d+m)?' with the first part
     /// denominating the hours and the second part the minutes.
     #[structopt(
@@ -87,6 +83,15 @@ struct Opt {
         parse(try_from_str = parse_duration)
     )]
     duration_of_day: Option<chrono::Duration>,
+
+    /// Timezone in the format `Europe/Berlin` (usually this is not needed. However, Jira requires
+    /// timezones for time logging)
+    #[structopt(short = "z")]
+    timezone: Option<chrono_tz::Tz>,
+
+    /// Log the times of the days to the configured JIRA server
+    #[structopt(long = "log_to_jira")]
+    log_to_jira: bool,
 
     /// The base URL of the JIRA server (e.g. 'https://jira.example.com/jira')
     #[structopt(long = "jira_base_url")]
@@ -140,11 +145,12 @@ fn main() {
         debug: opt_from_args.debug || opt_from_file.debug,
         verbose: opt_from_args.verbose || opt_from_file.verbose,
         be_lenient: opt_from_args.be_lenient || opt_from_file.be_lenient,
-        log_to_jira: opt_from_args.log_to_jira, // here we actually ignore the options from the file
         duration_of_day: first_available(
             opt_from_args.duration_of_day,
             opt_from_file.duration_of_day,
         ),
+        timezone: first_available(opt_from_args.timezone, opt_from_file.timezone),
+        log_to_jira: opt_from_args.log_to_jira, // here we actually ignore the options from the file
         jira_base_url: first_available(opt_from_args.jira_base_url, opt_from_file.jira_base_url),
         jira_username: first_available(opt_from_args.jira_username, opt_from_file.jira_username),
         jira_password: first_available(opt_from_args.jira_password, opt_from_file.jira_password),
@@ -288,10 +294,16 @@ fn main() {
         if opt.be_lenient {
             println!("ERROR: Updating JIRA-logging is forbidden in lenient mode!");
         } else {
+            let timezone = if let Some(tz) = opt.timezone {
+                log_work::jira::TimeZone::Tz(tz)
+            } else {
+                log_work::jira::TimeZone::Local(chrono::Local)
+            };
             let jira_config = log_work::jira::JiraConfig {
                 base_url: opt.jira_base_url.expect("Missing JIRA base URL"),
                 username: opt.jira_username.expect("Missing JIRA username"),
                 password: opt.jira_password.clone(),
+                timezone,
             };
 
             let result = log_work::jira::update_logging_for_days(

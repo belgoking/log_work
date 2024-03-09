@@ -8,6 +8,7 @@ edition = "2021"
 regex = "1.10"
 lazy_static = "1.4"
 chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = { version = "0.8.6", features = ["serde"] }
 structopt = "0.3"
 directories = "5.0"
 itertools = "0.10"
