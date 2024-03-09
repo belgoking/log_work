@@ -118,11 +118,11 @@ mod my_date_format {
 
     const FORMAT: &str = "%Y-%m-%dT%H:%M:%S%.3f%z";
 
-    pub fn serialize<S>(date: &DateTime, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    pub fn serialize<S>(date_time: &DateTime, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let s = format!("{}", date.format(FORMAT));
+        let s = format!("{}", date_time.format(FORMAT));
         serializer.serialize_str(&s)
     }
 
