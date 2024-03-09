@@ -178,7 +178,7 @@ fn main() {
             continue;
         }
         let day_raw = day_raw.as_ref().unwrap();
-        if let Some(ref e) = work_day_by_date.insert(day_raw.date.clone(), (*day_raw).clone()) {
+        if let Some(ref e) = work_day_by_date.insert(day_raw.date, (*day_raw).clone()) {
             println!("Duplicate day: {:?}", e);
             has_error = true;
         }
@@ -191,7 +191,7 @@ fn main() {
     let (min_day, max_day) =
         work_days_raw
             .iter()
-            .fold((*first_date, *first_date), |(min, max), ref day| {
+            .fold((*first_date, *first_date), |(min, max), day| {
                 let date = &day.as_ref().unwrap().date;
                 (std::cmp::min(min, *date), std::cmp::max(max, *date))
             });
@@ -243,11 +243,11 @@ fn main() {
 
     let mut summary = log_work::work_day::Summary::new();
     let mut sum_required = chrono::Duration::hours(0);
-    for ref day in &days.days {
+    for day in &days.days {
         println!(
             "{}",
             log_work::work_day::DaySummary {
-                day: &day,
+                day,
                 verbose: opt.verbose
             }
         );
@@ -255,7 +255,7 @@ fn main() {
             &mut summary,
             &day.work_day.compute_summary(),
         );
-        sum_required = sum_required + day.required_time.required_time;
+        sum_required += day.required_time.required_time;
     }
     if days.days.len() > 1 {
         println!("= Summary for all days:");
@@ -270,7 +270,7 @@ fn main() {
                 }
             );
             if key != "Pause" {
-                sum = sum + *duration;
+                sum += *duration;
             }
         }
         println!(
