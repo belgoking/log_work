@@ -7,6 +7,7 @@ pub enum Error {
     Network(reqwest::Error),
     HttpErrorStatusCode(reqwest::StatusCode),
     Conversion(core::num::TryFromIntError),
+    Canceled,
     Misc(String),
 }
 
@@ -259,14 +260,23 @@ async fn do_update_logging_for_days(
     );
 
     // println!("Would delete: {:?}", my_logs.iter().map(|ref log| format!("{}_{}", log.issue_id, log.id)).collect::<std::vec::Vec<_>>());
-    for ref worklog in my_logs {
-        println!("Do you want to delete old worklog entry for issue={} start_time='{}' duration={}(secs)? (yN): ",
-                 worklog.issue_id, worklog.started, worklog.time_spent_seconds);
+    if !my_logs.is_empty() {
+        println!("The following entries have already been logged to the current day:");
+        for worklog in &my_logs {
+            println!(
+                "issue={} start_time='{}' duration={}(secs)?",
+                worklog.issue_id, worklog.started, worklog.time_spent_seconds
+            );
+        }
+        println!("Do you want to delete them and replace them with the current ones? (yN)");
         // this blocks on purpose (see documentation of tokio::io::stdin())
         let mut buf = String::new();
         std::io::stdin().read_line(&mut buf)?;
-        if buf.as_str() == "y\n" {
-            // TODO: delete the entry
+        if buf.as_str() != "y\n" {
+            println!("Aborting!");
+            return Err(Error::Canceled);
+        }
+        for worklog in &my_logs {
             let uri = format!(
                 "{}/rest/api/2/issue/{}/worklog/{}",
                 jira_config.base_url, worklog.issue_id, worklog.id
@@ -283,8 +293,6 @@ async fn do_update_logging_for_days(
             if !response.status().is_success() {
                 return Err(Error::HttpErrorStatusCode(response.status()));
             }
-        } else {
-            println!("ignoring old entry");
         }
     }
 
