@@ -105,6 +105,10 @@ struct Opt {
     #[structopt(long = "jira_password")]
     jira_password: Option<String>,
 
+    /// A session cookie for JIRA
+    #[structopt(long = "cookie")]
+    jira_session_cookie: Option<String>,
+
     /// The .work-files
     #[structopt(parse(from_os_str))]
     files: Vec<std::path::PathBuf>,
@@ -140,6 +144,15 @@ fn main() {
     }
     let mut files = opt_from_args.files;
     files.append(&mut opt_from_file.files);
+    let jira_session_cookie = first_available(
+        opt_from_args.jira_session_cookie,
+        opt_from_file.jira_session_cookie,
+    );
+    // Regard the password, if there is no session cookie, only
+    let jira_password = match &jira_session_cookie {
+        Some(_) => None,
+        None => first_available(opt_from_args.jira_password, opt_from_file.jira_password),
+    };
     let opt = Opt {
         holidays: first_available(opt_from_args.holidays, opt_from_file.holidays),
         debug: opt_from_args.debug || opt_from_file.debug,
@@ -153,7 +166,8 @@ fn main() {
         log_to_jira: opt_from_args.log_to_jira, // here we actually ignore the options from the file
         jira_base_url: first_available(opt_from_args.jira_base_url, opt_from_file.jira_base_url),
         jira_username: first_available(opt_from_args.jira_username, opt_from_file.jira_username),
-        jira_password: first_available(opt_from_args.jira_password, opt_from_file.jira_password),
+        jira_password,
+        jira_session_cookie,
         files,
     };
 
@@ -299,10 +313,21 @@ fn main() {
             } else {
                 log_work::jira::TimeZone::Local(chrono::Local)
             };
+            let authentication = match opt.jira_session_cookie {
+                Some(jira_session_cookie) => {
+                    log_work::jira::AuthentificationConfig::Cookie(jira_session_cookie)
+                }
+                None => match opt.jira_password {
+                    Some(jira_password) => {
+                        log_work::jira::AuthentificationConfig::BasicAuthPassword(jira_password)
+                    }
+                    None => log_work::jira::AuthentificationConfig::None,
+                },
+            };
             let jira_config = log_work::jira::JiraConfig {
                 base_url: opt.jira_base_url.expect("Missing JIRA base URL"),
                 username: opt.jira_username.expect("Missing JIRA username"),
-                password: opt.jira_password.clone(),
+                authentication,
                 timezone,
             };
 
