@@ -68,14 +68,8 @@ impl TimeZone {
 pub struct JiraConfig {
     pub base_url: String,
     pub username: String,
-    pub authentication: AuthentificationConfig,
+    pub password: Option<String>,
     pub timezone: TimeZone,
-}
-
-pub enum AuthentificationConfig {
-    BasicAuthPassword(String),
-    Cookie(String),
-    None,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug)]
@@ -143,34 +137,16 @@ mod my_date_format {
     }
 }
 
-fn add_authentication(
-    request_builder: reqwest::RequestBuilder,
-    jira_config: &JiraConfig,
-) -> reqwest::RequestBuilder {
-    match &jira_config.authentication {
-        AuthentificationConfig::BasicAuthPassword(pw) => {
-            request_builder.basic_auth(jira_config.username.as_str(), Some(pw.as_str()))
-        }
-        AuthentificationConfig::Cookie(session_cookie) => {
-            request_builder.header("cookie", session_cookie.as_str())
-        }
-        AuthentificationConfig::None => {
-            request_builder.basic_auth::<&str, &str>(jira_config.username.as_str(), None)
-        }
-    }
-}
-
 async fn retrieve_json<T: for<'de> serde::Deserialize<'de>>(
     query_path: &str,
     client: &reqwest::Client,
     jira_config: &JiraConfig,
 ) -> Result<T> {
-    let response = add_authentication(
-        client.get(&format!("{}{}", jira_config.base_url, query_path)),
-        jira_config,
-    )
-    .send()
-    .await?;
+    let response = client
+        .get(&format!("{}{}", jira_config.base_url, query_path))
+        .basic_auth(&jira_config.username, jira_config.password.as_ref())
+        .send()
+        .await?;
     if !response.status().is_success() {
         return Err(Error::HttpErrorStatusCode(response.status()));
     }
@@ -184,16 +160,15 @@ async fn post_worklog(
     jira_config: &JiraConfig,
 ) -> Result<()> {
     println!("POSTING ISSUE {} ({:?})", issue_name, new_worklog);
-    let response = add_authentication(
-        client.post(&format!(
+    let response = client
+        .post(&format!(
             "{}/rest/api/2/issue/{}/worklog",
             jira_config.base_url, issue_name
-        )),
-        jira_config,
-    )
-    .json(new_worklog)
-    .send()
-    .await?;
+        ))
+        .basic_auth(&jira_config.username, jira_config.password.as_ref())
+        .json(new_worklog)
+        .send()
+        .await?;
     if !response.status().is_success() {
         return Err(Error::HttpErrorStatusCode(response.status()));
     }
@@ -306,7 +281,9 @@ async fn do_update_logging_for_days(
                 "{}/rest/api/2/issue/{}/worklog/{}",
                 jira_config.base_url, worklog.issue_id, worklog.id
             );
-            let response = add_authentication(client.delete(uri.as_str()), jira_config)
+            let response = client
+                .delete(uri.as_str())
+                .basic_auth(&jira_config.username, jira_config.password.as_ref())
                 .send()
                 .await
                 .map_err(|err| {
