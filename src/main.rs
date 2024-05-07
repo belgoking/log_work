@@ -97,6 +97,14 @@ struct Opt {
     #[structopt(long = "jira_base_url")]
     jira_base_url: Option<String>,
 
+    /// The username of an optional HTTP BasicAuth (in addition to Jira authentication)
+    #[structopt(long = "basic_auth_username")]
+    basic_auth_username: Option<String>,
+
+    /// The password of an optional HTTP BasicAuth (in addition to Jira authentication)
+    #[structopt(long = "basic_auth_password")]
+    basic_auth_password: Option<String>,
+
     /// The username of the JIRA user
     #[structopt(long = "jira_username")]
     jira_username: Option<String>,
@@ -152,6 +160,14 @@ fn main() {
         timezone: first_available(opt_from_args.timezone, opt_from_file.timezone),
         log_to_jira: opt_from_args.log_to_jira, // here we actually ignore the options from the file
         jira_base_url: first_available(opt_from_args.jira_base_url, opt_from_file.jira_base_url),
+        basic_auth_username: first_available(
+            opt_from_args.basic_auth_username,
+            opt_from_file.basic_auth_username,
+        ),
+        basic_auth_password: first_available(
+            opt_from_args.basic_auth_password,
+            opt_from_file.basic_auth_password,
+        ),
         jira_username: first_available(opt_from_args.jira_username, opt_from_file.jira_username),
         jira_password: first_available(opt_from_args.jira_password, opt_from_file.jira_password),
         files,
@@ -299,10 +315,24 @@ fn main() {
             } else {
                 log_work::jira::TimeZone::Local(chrono::Local)
             };
+            if opt.basic_auth_username.is_some() != opt.basic_auth_password.is_some() {
+                println!("The BasicAuth parameters all have to be either set or unset, but must not be partially set.");
+                return;
+            }
+            let basic_auth_credentials = if let Some(basic_auth_username) = &opt.basic_auth_username
+            {
+                Some((
+                    basic_auth_username.clone(),
+                    opt.basic_auth_password.unwrap().clone(),
+                ))
+            } else {
+                None
+            };
             let jira_config = log_work::jira::JiraConfig {
                 base_url: opt.jira_base_url.expect("Missing JIRA base URL"),
+                basic_auth_credentials,
                 username: opt.jira_username.expect("Missing JIRA username"),
-                password: opt.jira_password.clone(),
+                password: opt.jira_password.expect("Missing JIRA password"),
                 timezone,
             };
 
