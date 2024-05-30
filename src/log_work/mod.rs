@@ -53,71 +53,70 @@ pub enum Error {
 impl PartialEq for Error {
     fn eq(&self, other: &Error) -> bool {
         match (self, other) {
-            (&Error::CommandLine(ref s), &Error::CommandLine(ref o)) => s == o,
-            (&Error::IO(_), &Error::IO(_)) => true,
-            (&Error::ParseInt(_), &Error::ParseInt(_)) => true,
+            (Error::CommandLine(ref s), Error::CommandLine(ref o)) => s == o,
+            (Error::IO(_), Error::IO(_)) => true,
+            (Error::ParseInt(_), Error::ParseInt(_)) => true,
             (
-                &Error::InvalidFileName { file: ref s_file },
-                &Error::InvalidFileName { file: ref o_file },
+                Error::InvalidFileName { file: ref s_file },
+                Error::InvalidFileName { file: ref o_file },
             ) => s_file == o_file,
             (
-                &Error::ParseDayType {
+                Error::ParseDayType {
                     file: ref s_file,
                     line_nr: s_line_nr,
                 },
-                &Error::ParseDayType {
+                Error::ParseDayType {
                     file: ref o_file,
                     line_nr: o_line_nr,
                 },
             ) => s_file == o_file && s_line_nr == o_line_nr,
-            (&Error::ParseDay, &Error::ParseDay) => true,
-            (&Error::ParseTime, &Error::ParseTime) => true,
+            (Error::ParseDay, &Error::ParseDay) => true,
+            (Error::ParseTime, &Error::ParseTime) => true,
             (
-                &Error::TimeNotMonotonic {
+                Error::TimeNotMonotonic {
                     file: ref s_file,
                     line_nr: s_line_nr,
                 },
-                &Error::TimeNotMonotonic {
-                    file: ref o_file,
-                    line_nr: o_line_nr,
-                },
-            ) => s_file == o_file && s_line_nr == o_line_nr,
-            (
-                &Error::DuplicateDate {
-                    file: ref s_file,
-                    line_nr: s_line_nr,
-                },
-                &Error::DuplicateDate {
+                Error::TimeNotMonotonic {
                     file: ref o_file,
                     line_nr: o_line_nr,
                 },
             ) => s_file == o_file && s_line_nr == o_line_nr,
             (
-                &Error::EntryAfterSeparator {
+                Error::DuplicateDate {
                     file: ref s_file,
                     line_nr: s_line_nr,
                 },
-                &Error::EntryAfterSeparator {
+                Error::DuplicateDate {
                     file: ref o_file,
                     line_nr: o_line_nr,
                 },
             ) => s_file == o_file && s_line_nr == o_line_nr,
             (
-                &Error::MissingDate { file: ref s_file },
-                &Error::MissingDate { file: ref o_file },
+                Error::EntryAfterSeparator {
+                    file: ref s_file,
+                    line_nr: s_line_nr,
+                },
+                Error::EntryAfterSeparator {
+                    file: ref o_file,
+                    line_nr: o_line_nr,
+                },
+            ) => s_file == o_file && s_line_nr == o_line_nr,
+            (Error::MissingDate { file: ref s_file }, Error::MissingDate { file: ref o_file }) => {
+                s_file == o_file
+            }
+            (
+                Error::MissingFinalPause { file: ref s_file },
+                Error::MissingFinalPause { file: ref o_file },
             ) => s_file == o_file,
             (
-                &Error::MissingFinalPause { file: ref s_file },
-                &Error::MissingFinalPause { file: ref o_file },
-            ) => s_file == o_file,
-            (
-                &Error::UnexpectedDate {
+                Error::UnexpectedDate {
                     file: ref s_file,
                     line_nr: s_line_nr,
                     expected_date: ref s_expected_date,
                     found_date: ref s_found_date,
                 },
-                &Error::UnexpectedDate {
+                Error::UnexpectedDate {
                     file: ref o_file,
                     line_nr: o_line_nr,
                     expected_date: ref o_expected_date,
@@ -129,7 +128,7 @@ impl PartialEq for Error {
                     && s_expected_date == o_expected_date
                     && s_found_date == o_found_date
             }
-            _ => return false,
+            _ => false,
         }
     }
 }

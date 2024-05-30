@@ -135,7 +135,6 @@ impl WorkDay {
         file: &str,
     ) -> Result<WorkDay> {
         let mut line_nr = 0u32;
-        let date: Option<Date>;
         let (mut non_empty, mut line) = WorkDay::read_line(stream)?;
         while !non_empty {
             line_nr += 1;
@@ -143,7 +142,7 @@ impl WorkDay {
             non_empty = tmp_non_empty;
             line = tmp_line;
         }
-        if line == "" {
+        if line.is_empty() {
             if expected_date.is_none() {
                 return Err(Error::MissingDate {
                     file: file.to_string(),
@@ -157,10 +156,10 @@ impl WorkDay {
         }
         // handle the entries, if there are some
         let entries = WorkDay::parse_entries(line, stream, &expected_date, file, &mut line_nr)?;
-        date = if entries.is_empty() {
+        let date = if entries.is_empty() {
             expected_date
         } else {
-            Some(entries.get(0).unwrap().start_ts.date())
+            Some(entries.first().unwrap().start_ts.date())
         };
 
         // the remaining of the file is the description here we merely check that there is no
@@ -182,19 +181,17 @@ impl WorkDay {
             let (_, tmp_line) = WorkDay::read_line(stream)?;
             line = tmp_line;
         }
-        if !entries.is_empty() {
-            if &entries.get(entries.len() - 1).unwrap().key != "Pause" {
-                if be_lenient {
-                    // TODO: log a warning using a logger
-                    println!(
-                        "WARNING: Missing 'Pause' as last entry for the day for file '{}'!",
-                        file
-                    );
-                } else {
-                    return Err(Error::MissingFinalPause {
-                        file: file.to_string(),
-                    });
-                }
+        if !entries.is_empty() && &entries.last().unwrap().key != "Pause" {
+            if be_lenient {
+                // TODO: log a warning using a logger
+                println!(
+                    "WARNING: Missing 'Pause' as last entry for the day for file '{}'!",
+                    file
+                );
+            } else {
+                return Err(Error::MissingFinalPause {
+                    file: file.to_string(),
+                });
             }
         }
         match date {

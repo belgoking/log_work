@@ -6,7 +6,7 @@ pub fn to_date(year: &str, month: &str, day: &str) -> Result<Date> {
     let year = year.parse::<i32>()?;
     let month = month.parse::<u32>()?;
     let day = day.parse::<u32>()?;
-    return Ok(Date::from_ymd_opt(year, month, day).ok_or_else(|| Error::ParseDay)?);
+    Date::from_ymd_opt(year, month, day).ok_or_else(|| Error::ParseDay)
 }
 
 pub struct HourMinuteDuration<'a> {
@@ -15,12 +15,12 @@ pub struct HourMinuteDuration<'a> {
 
 impl<'a> std::fmt::Display for HourMinuteDuration<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        return write!(
+        write!(
             f,
             "{:>2}:{:02}",
             self.duration.num_hours(),
             self.duration.num_minutes() % 60
-        );
+        )
     }
 }
 

@@ -160,7 +160,7 @@ fn opt_add_basic_auth(
     basic_auth_credentials: &Option<(String, String)>,
 ) -> reqwest::RequestBuilder {
     match basic_auth_credentials {
-        Some((username, password)) => request_builder.basic_auth(&username, Some(password)),
+        Some((username, password)) => request_builder.basic_auth(username, Some(password)),
         None => request_builder,
     }
 }

@@ -28,21 +28,21 @@ enum DayTypeClass {
 impl DayType {
     fn to_day_type_class(&self) -> DayTypeClass {
         match *self {
-            DayType::WorkDay => return DayTypeClass::Work,
-            DayType::OvertimeReduction { description: _ } => return DayTypeClass::Work,
-            DayType::WeekEnd => return DayTypeClass::WeekendAndHolidays,
-            DayType::JobTravel { description: _ } => return DayTypeClass::Work,
-            DayType::Sick { description: _ } => return DayTypeClass::Work,
-            DayType::Holiday { name: _ } => return DayTypeClass::WeekendAndHolidays,
-            DayType::Vacation { description: _ } => return DayTypeClass::Vacation,
-            DayType::VacationHalfDay { description: _ } => return DayTypeClass::Vacation,
-        };
+            DayType::WorkDay => DayTypeClass::Work,
+            DayType::OvertimeReduction { description: _ } => DayTypeClass::Work,
+            DayType::WeekEnd => DayTypeClass::WeekendAndHolidays,
+            DayType::JobTravel { description: _ } => DayTypeClass::Work,
+            DayType::Sick { description: _ } => DayTypeClass::Work,
+            DayType::Holiday { name: _ } => DayTypeClass::WeekendAndHolidays,
+            DayType::Vacation { description: _ } => DayTypeClass::Vacation,
+            DayType::VacationHalfDay { description: _ } => DayTypeClass::Vacation,
+        }
     }
 }
 
 impl std::fmt::Display for DayType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        return match *self {
+        match *self {
             DayType::WorkDay => write!(f, "WorkDay"),
             DayType::OvertimeReduction { description: ref s } => {
                 write!(f, "OvertimeReduction({})", s)
@@ -53,7 +53,7 @@ impl std::fmt::Display for DayType {
             DayType::Holiday { name: ref s } => write!(f, "Holiday({})", s),
             DayType::Vacation { description: ref s } => write!(f, "Vacation({})", s),
             DayType::VacationHalfDay { description: ref s } => write!(f, "VacationHalfDay({})", s),
-        };
+        }
     }
 }
 
@@ -66,11 +66,11 @@ pub struct DayTypeEntry {
 }
 
 fn get_day_type_description(c: &regex::Captures) -> String {
-    if let Some(_) = c.get(4) {
+    if c.get(4).is_some() {
         return c[4].to_string();
     }
     // if c[4] is not None c[5] must be there
-    return c[5].to_string();
+    c[5].to_string()
 }
 
 fn check_day_types(orig: &DayTypeEntry, new_entry: &DayTypeEntry) -> Result<()> {
