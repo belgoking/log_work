@@ -334,6 +334,7 @@ async fn do_update_logging_for_days_with_session(
                     entry.author.name == jira_config.username
                         && relevant_days.contains(&entry.started.date_naive())
                 })
+                .map(|entry| StoredWorklogEntry{ issue_id: issue.to_string(), ..entry})
                 .collect();
             my_logs.append(&mut worklogs);
         }
