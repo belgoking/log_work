@@ -23,8 +23,8 @@ if !exists("*s:InsertTimestamp")
     endfunction
 endif
 
-"let s:path = fnamemodify(resolve(expand('<sfile>:p')), ':h') + "/InsertTickets.py"
-py3file ~/.vim/bundle/add_times/InsertTickets.py
+let s:insert_ticket_path = fnamemodify(resolve(expand('<sfile>:p')), ':h') . "/../InsertTickets.py"
+:execute "py3file " . expand(s:insert_ticket_path)
 if !exists("*s:InsertTickets")
     function s:InsertTickets()
         py3 insertTicketNames()
