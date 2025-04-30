@@ -126,6 +126,7 @@ fn main() {
             let mut lines: Vec<String> = std::io::BufReader::new(f)
                 .lines()
                 .map(|e| e.unwrap())
+                .filter(|l| !l.is_empty())
                 .collect();
             lines.insert(0, "DUMMY".to_string()); // normally the first element holds the program name
             Opt::from_iter(lines.iter())
