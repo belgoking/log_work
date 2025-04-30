@@ -43,5 +43,5 @@ imap <buffer> <F4> <Esc>:call <SID>InsertTimestamp()<CR>aPause<CR>
 " You will need to have the "log_work" script in your "PATH" environment variable
 nmap <buffer> <F5> :w<CR>:! log_work -v -l %<CR>
 imap <buffer> <F5> <Esc>:w<CR>:! log_work -v -l %<CR>
-nmap <buffer> <S-F5> :w<CR>:! log_work -v --log_to_jira %<CR>
-imap <buffer> <S-F5> <Esc>:w<CR>:! log_work -v --log_to_jira %<CR>
+nmap <buffer> <F17> :w<CR>:! log_work -v --log_to_jira %<CR>
+imap <buffer> <F17> <Esc>:w<CR>:! log_work -v --log_to_jira %<CR>
