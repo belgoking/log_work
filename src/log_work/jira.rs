@@ -69,14 +69,7 @@ pub struct JiraConfig {
     pub base_url: String,
     pub basic_auth_credentials: Option<(String, String)>,
     pub username: String,
-    pub password: String,
     pub timezone: TimeZone,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug)]
-struct Credentials {
-    username: String,
-    password: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Eq, PartialEq, PartialOrd, Ord, Debug)]
@@ -165,65 +158,15 @@ fn opt_add_basic_auth(
     }
 }
 
-async fn request_session_cookie(
-    client: &reqwest::Client,
-    jira_config: &JiraConfig,
-) -> Result<String> {
-    println!("REQUESTING SESSION FOR {}", jira_config.username);
-    let response = opt_add_basic_auth(
-        client.post(&format!("{}/rest/auth/1/session", jira_config.base_url)),
-        &jira_config.basic_auth_credentials,
-    )
-    .json(&Credentials {
-        username: jira_config.username.clone(),
-        password: jira_config.password.clone(),
-    })
-    .send()
-    .await?;
-    if !response.status().is_success() {
-        return Err(Error::HttpErrorStatusCode(response.status()));
-    }
-    let session_details = response.json::<SessionHolder>().await?.session;
-    Ok(format!(
-        "{}={}",
-        session_details.name, session_details.value
-    ))
-}
-
-async fn delete_session_cookie(
-    client: &reqwest::Client,
-    jira_config: &JiraConfig,
-    session_cookie: &str,
-) -> Result<String> {
-    println!("DISCARDING SESSION FOR {}", jira_config.username);
-    let response = opt_add_basic_auth(
-        client.delete(&format!("{}/rest/auth/1/session", jira_config.base_url)),
-        &jira_config.basic_auth_credentials,
-    )
-    .header("Cookie", session_cookie)
-    .send()
-    .await?;
-    if !response.status().is_success() {
-        return Err(Error::HttpErrorStatusCode(response.status()));
-    }
-    let session_details = response.json::<SessionHolder>().await?.session;
-    Ok(format!(
-        "{}={}",
-        session_details.name, session_details.value
-    ))
-}
-
 async fn retrieve_json<T: for<'de> serde::Deserialize<'de>>(
     query_path: &str,
     client: &reqwest::Client,
     jira_config: &JiraConfig,
-    session_cookie: &str,
 ) -> Result<T> {
     let response = opt_add_basic_auth(
         client.get(&format!("{}{}", jira_config.base_url, query_path)),
         &jira_config.basic_auth_credentials,
     )
-    .header("Cookie", session_cookie)
     .send()
     .await?;
     if !response.status().is_success() {
@@ -237,7 +180,6 @@ async fn post_worklog(
     new_worklog: &NewWorklogEntry,
     client: &reqwest::Client,
     jira_config: &JiraConfig,
-    session_cookie: &str,
 ) -> Result<()> {
     println!("POSTING ISSUE {} ({:?})", issue_name, new_worklog);
     let response = opt_add_basic_auth(
@@ -247,7 +189,6 @@ async fn post_worklog(
         )),
         &jira_config.basic_auth_credentials,
     )
-    .header("Cookie", session_cookie)
     .json(new_worklog)
     .send()
     .await?;
@@ -261,14 +202,13 @@ async fn retrieve_issues_with_worklogs(
     day: &super::Date,
     client: &reqwest::Client,
     jira_config: &JiraConfig,
-    session_cookie: &str,
 ) -> Result<Vec<String>> {
     // TODO: add request filter such that not all fields of the Tickets are retrieved
     let uri = format!(
         "/rest/api/2/search?jql=worklogAuthor%3DcurrentUser()+AND+worklogDate%3D{}",
         day.format("%Y-%m-%d")
     );
-    let issues = retrieve_json::<ResponseWithIssues>(&uri, client, jira_config, session_cookie)
+    let issues = retrieve_json::<ResponseWithIssues>(&uri, client, jira_config)
         .await?
         .issues
         .drain(..)
@@ -281,10 +221,9 @@ async fn is_jira_issue(
     issue: &str,
     client: &reqwest::Client,
     jira_config: &JiraConfig,
-    session_cookie: &str,
 ) -> Result<bool> {
     let uri = format!("/rest/api/2/issue/{}?fields=id", issue);
-    if let Err(e) = retrieve_json::<Issue>(&uri, client, jira_config, session_cookie).await {
+    if let Err(e) = retrieve_json::<Issue>(&uri, client, jira_config).await {
         match e {
             Error::HttpErrorStatusCode(reqwest::StatusCode::NOT_FOUND) => return Ok(false),
             _ => return Err(e),
@@ -305,7 +244,6 @@ async fn do_update_logging_for_days_with_session(
     days: &std::vec::Vec<&work_day::WorkDay>,
     client: &reqwest::Client,
     jira_config: &JiraConfig,
-    session_cookie: &str,
 ) -> Result<()> {
     let mut issues_with_old_logs = std::collections::BTreeSet::new();
     println!(
@@ -314,7 +252,7 @@ async fn do_update_logging_for_days_with_session(
     );
     for day in days {
         let mut issues =
-            retrieve_issues_with_worklogs(&day.date, client, jira_config, session_cookie).await?;
+            retrieve_issues_with_worklogs(&day.date, client, jira_config).await?;
         issues_with_old_logs.extend(issues.drain(..));
     }
 
@@ -325,7 +263,7 @@ async fn do_update_logging_for_days_with_session(
         for ref issue in &issues_with_old_logs {
             let uri = format!("/rest/api/2/issue/{}/worklog", issue);
             let mut worklogs =
-                retrieve_json::<ResponseWithWorklogs>(&uri, client, jira_config, session_cookie)
+                retrieve_json::<ResponseWithWorklogs>(&uri, client, jira_config)
                     .await?;
             let mut worklogs: std::vec::Vec<_> = worklogs
                 .worklogs
@@ -372,7 +310,6 @@ async fn do_update_logging_for_days_with_session(
                 client.delete(uri.as_str()),
                 &jira_config.basic_auth_credentials,
             )
-            .header("Cookie", session_cookie)
             .send()
             .await
             .map_err(|err| {
@@ -400,7 +337,7 @@ async fn do_update_logging_for_days_with_session(
     // check whether the given issue names exist
     let mut unknown_issues = std::collections::BTreeSet::new();
     for issue in possible_issue_names {
-        match is_jira_issue(issue, client, jira_config, session_cookie).await {
+        match is_jira_issue(issue, client, jira_config).await {
             Err(e) => {
                 println!("Error while verifying issue='{}': {:?}", issue, e);
                 unknown_issues.insert(issue);
@@ -434,7 +371,6 @@ async fn do_update_logging_for_days_with_session(
                     &new_worklog,
                     client,
                     jira_config,
-                    session_cookie,
                 )
                 .await
                 {
@@ -460,20 +396,12 @@ async fn do_update_logging_for_days(
     jira_config: &JiraConfig,
 ) -> Result<()> {
     let client = reqwest::Client::new();
-
-    let session_cookie = request_session_cookie(&client, jira_config).await?;
-
-    let tmp_result = do_update_logging_for_days_with_session(
+    do_update_logging_for_days_with_session(
         days,
         &client,
         jira_config,
-        session_cookie.as_str(),
     )
-    .await;
-
-    let _ = delete_session_cookie(&client, jira_config, session_cookie.as_str()).await;
-
-    tmp_result
+    .await
 }
 
 pub fn update_logging_for_days(
