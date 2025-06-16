@@ -72,7 +72,7 @@ impl WorkDay {
     fn read_line(stream: &mut dyn std::io::BufRead) -> Result<(bool, String)> {
         let mut line = String::new();
         let num_bytes = stream.read_line(&mut line)?;
-        Ok(((num_bytes != 0 && line != "\n"), line))
+        Ok(((num_bytes != 0 && line != "\n" && line.chars().nth(0).unwrap() != '#'), line))
     }
 
     fn parse_entries_line(line: &str) -> EntriesLine {
